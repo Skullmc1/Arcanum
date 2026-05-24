@@ -114,14 +114,20 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
      * Checks for updates from the web.
      */
     private void checkForUpdates(CommandSourceStack source) {
-        String updateUrl = "https://your-site.vercel.app/api/plugin-version"; // Change this to your actual URL
+        String updateUrl = "https://www.qclid.space/api/plugin-version";
+        String startMsg = "[Dashboard] Checking for updates...";
+        String failMsg = "Updating failed, will try again next time server restarts.";
+
+        if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps(startMsg)));
+        else getLogger().info(toSmallCaps(startMsg));
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(updateUrl)).GET().build();
 
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
             if (response.statusCode() != 200) {
-                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Update check failed.")));
+                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps(failMsg)));
+                else getLogger().warning(toSmallCaps(failMsg));
                 return;
             }
 
@@ -140,7 +146,8 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                     source.getSender().sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Plugin is up to date!")));
                 }
             } catch (Exception e) {
-                getLogger().severe("Error parsing update JSON: " + e.getMessage());
+                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps(failMsg)));
+                else getLogger().warning(toSmallCaps(failMsg) + " (" + e.getMessage() + ")");
             }
         });
     }

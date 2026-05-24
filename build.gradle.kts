@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "me.gemini"
-version = "1.0-SNAPSHOT"
+version = "1.1"
 
 repositories {
     mavenCentral()
@@ -58,5 +58,5 @@ tasks.runServer {
 }
 
 tasks.withType<Jar> {
-    archiveFileName.set("Dashboard.jar")
+    archiveFileName.set("Dashboard-${project.version}.jar")
 }
