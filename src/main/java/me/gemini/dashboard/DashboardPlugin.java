@@ -65,7 +65,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        getLogger().info("Dashboard v1.0 enabled! Auto-updater and features active.");
+        getLogger().info("Dashboard v" + getDescription().getVersion() + " enabled! Auto-updater and features active.");
 
         getServer().getPluginManager().registerEvents(this, this);
 
@@ -115,19 +115,19 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
      */
     private void checkForUpdates(CommandSourceStack source) {
         String updateUrl = "https://www.qclid.space/api/plugin-version";
-        String startMsg = "[Dashboard] Checking for updates...";
+        String startMsg = "Checking for updates...";
         String failMsg = "Updating failed, will try again next time server restarts.";
 
-        if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps(startMsg)));
-        else getLogger().info(toSmallCaps(startMsg));
+        if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("[Dashboard] " + startMsg)));
+        else getLogger().info(startMsg);
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(updateUrl)).GET().build();
 
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
             if (response.statusCode() != 200) {
-                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps(failMsg)));
-                else getLogger().warning(toSmallCaps(failMsg));
+                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("[Dashboard] " + failMsg)));
+                else getLogger().warning(failMsg);
                 return;
             }
 
@@ -137,17 +137,19 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                 String downloadUrl = json.get("downloadUrl").getAsString();
 
                 if (isNewer(latestVersion, getDescription().getVersion())) {
-                    String msg = C_GOLD + toSmallCaps("New update found! Downloading v") + latestVersion;
-                    if (source != null) source.getSender().sendMessage(miniMessage.deserialize(msg));
+                    String msg = "New update found! Downloading v" + latestVersion;
+                    if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("[Dashboard] " + msg)));
                     else getLogger().info(msg);
 
                     downloadAndPrepareUpdate(downloadUrl);
-                } else if (source != null) {
-                    source.getSender().sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Plugin is up to date!")));
+                } else {
+                    String upToDateMsg = "Plugin is up to date!";
+                    if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("[Dashboard] " + upToDateMsg)));
+                    else getLogger().info(upToDateMsg);
                 }
             } catch (Exception e) {
-                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps(failMsg)));
-                else getLogger().warning(toSmallCaps(failMsg) + " (" + e.getMessage() + ")");
+                if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("[Dashboard] " + failMsg)));
+                else getLogger().warning(failMsg + " (" + e.getMessage() + ")");
             }
         });
     }

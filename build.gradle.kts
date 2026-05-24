@@ -30,9 +30,8 @@ tasks {
 
     runServer {
         minecraftVersion("26.1.2")
-        // Automatically agree to the Minecraft EULA
-        // Note: In run-paper 3.x, this is done via the eula property or a separate task
-        // But most users just want it to work.
+        // Suppress sun.misc.Unsafe warnings from JOML (JEP 471)
+        jvmArgs("-Djoml.nounsafe", "--sun-misc-unsafe-memory-access=allow")
     }
 
     register("runclient") {
