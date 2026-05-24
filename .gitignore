@@ -1,0 +1,31 @@
+# Gradle
+.gradle/
+build/
+
+# Minecraft Server Run Directory
+# (Ignoring everything in 'run' except for the folder itself if needed)
+run/
+
+# Maven (Legacy)
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+bin/
+
+# OS specific
+Thumbs.db
+.DS_Store
+
+# Log files
+*.log
+*.log.gz
+
+# Java/JARs
+*.jar
+!src/**/lib/*.jar

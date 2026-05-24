@@ -1,0 +1,6 @@
+name: Dashboard
+version: '1.0'
+main: me.gemini.dashboard.DashboardPlugin
+api-version: '26.1.2'
+description: 'Displays coordinates and other useful info in the action bar.'
+author: 'Gemini CLI'
