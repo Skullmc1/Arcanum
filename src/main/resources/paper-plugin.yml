@@ -1,6 +1,6 @@
 name: Dashboard
-version: "1.1"
-main: me.gemini.dashboard.DashboardPlugin
+version: "1.2"
+main: space.qclid.dashboard.DashboardPlugin
 api-version: "26.1.2"
 description: "Displays coordinates and other useful info in the action bar."
-author: "Gemini CLI"
+author: "Qclid"

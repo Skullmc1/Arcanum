@@ -4,8 +4,8 @@ plugins {
     id("xyz.jpenilla.run-paper") version "3.0.2"
 }
 
-group = "me.gemini"
-version = "1.1"
+group = "space.qclid"
+version = "1.2"
 
 repositories {
     mavenCentral()

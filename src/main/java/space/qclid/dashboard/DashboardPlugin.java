@@ -1,4 +1,4 @@
-package me.gemini.dashboard;
+package space.qclid.dashboard;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -10,6 +10,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,7 +19,12 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.server.ServerListPingEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -37,6 +44,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
 
     private final Map<UUID, PlayerSettings> playerSettings = new HashMap<>();
     private final Map<UUID, Map<PotionEffectType, Long>> effectHistory = new HashMap<>();
+    private final Map<UUID, UUID> tpRequests = new HashMap<>();
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
     // Update state
@@ -51,11 +59,16 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
     private static final String C_GRAY = "<#AAAAAA>";
     private static final String C_PURPLE = "<#DA70D6>";
 
+    private static final String G_GOLD = "<gradient:#FFD700:#FFA500>";
+
     private static class PlayerSettings {
         boolean showXyz = true;
         boolean showBiome = true;
         boolean showNetherXyz = true;
         boolean globalEnabled = true;
+        int tpCharges = 0;
+        final Map<String, Location> waypoints = new LinkedHashMap<>();
+        Location destination = null;
 
         void toggleGlobal() { globalEnabled = !globalEnabled; }
         void toggleXyz() { showXyz = !showXyz; }
@@ -97,6 +110,46 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                 });
 
             commands.register(posBuilder.build(), "Share your position globally", List.of("where"));
+
+            var tpBuilder = Commands.literal("tp")
+                .then(Commands.literal("accept").executes(ctx -> {
+                    handleTpResponse(ctx.getSource(), true);
+                    return 1;
+                }))
+                .then(Commands.literal("deny").executes(ctx -> {
+                    handleTpResponse(ctx.getSource(), false);
+                    return 1;
+                }))
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) {
+                        ctx.getSource().getSender().sendPlainMessage("ᴘʟᴀʏᴇʀѕ ᴏɴʟʏ.");
+                        return 1;
+                    }
+                    openTpMainMenu(player);
+                    return 1;
+                });
+
+            commands.register(tpBuilder.build(), "Teleport GUI system", List.of());
+
+            var destBuilder = Commands.literal("destination")
+                .then(Commands.literal("clear").executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                    PlayerSettings settings = playerSettings.get(player.getUniqueId());
+                    if (settings != null) settings.destination = null;
+                    player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Destination cleared!")));
+                    return 1;
+                }))
+                .then(Commands.argument("x", io.papermc.paper.command.brigadier.argument.ArgumentTypes.finePosition())
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                        io.papermc.paper.math.Position pos = ctx.getArgument("x", io.papermc.paper.math.Position.class);
+                        PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
+                        settings.destination = new Location(player.getWorld(), pos.x(), pos.y(), pos.z());
+                        player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Destination set to ") + (int)pos.x() + ", " + (int)pos.y() + ", " + (int)pos.z()));
+                        return 1;
+                    }));
+
+            commands.register(destBuilder.build(), "Set a navigation destination", List.of("dest"));
         });
 
         // Dashboard update task
@@ -263,6 +316,188 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         Bukkit.broadcast(miniMessage.deserialize(posMsg));
     }
 
+    // --- TP GUI System ---
+
+    private static final String GUI_TP_MAIN = "ᴛᴇʟᴇᴘᴏʀᴛ ᴍᴇɴᴜ";
+    private static final String GUI_TP_SELECT = "ѕᴇʟᴇᴄᴛ ᴀ ᴘʟᴀʏᴇʀ";
+
+    private void openTpMainMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 54, miniMessage.deserialize(G_GOLD + toSmallCaps(GUI_TP_MAIN)));
+        PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
+
+        ItemStack grayGlass = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        for (int i = 0; i < 54; i++) inv.setItem(i, grayGlass);
+
+        inv.setItem(13, createItem(Material.ENDER_EYE, G_GOLD + toSmallCaps("teleport stats"),
+            C_YELLOW + toSmallCaps("charges") + ": " + C_ORANGE + settings.tpCharges));
+
+        inv.setItem(29, createItem(Material.DIAMOND, G_GOLD + toSmallCaps("charge tp"),
+            C_GRAY + toSmallCaps("click with 20 diamonds to add 1 charge")));
+
+        inv.setItem(31, createItem(Material.ENDER_PEARL, G_GOLD + toSmallCaps("use charge"),
+            C_GRAY + toSmallCaps("click to select a player to teleport to")));
+
+        inv.setItem(33, createItem(Material.NAME_TAG, G_GOLD + toSmallCaps("create waypoint"),
+            C_GRAY + toSmallCaps("click with 30 diamonds to save current location")));
+
+        // Waypoints in bottom 2 rows (36-53)
+        int slot = 36;
+        for (Map.Entry<String, Location> entry : settings.waypoints.entrySet()) {
+            if (slot > 53) break;
+            Location l = entry.getValue();
+            inv.setItem(slot++, createItem(Material.COMPASS, G_GOLD + toSmallCaps(entry.getKey()),
+                C_YELLOW + toSmallCaps("location") + ": " + C_ORANGE + l.getBlockX() + " " + l.getBlockY() + " " + l.getBlockZ(),
+                C_RED + toSmallCaps("cost") + ": " + C_ORANGE + "5 " + toSmallCaps("charges")));
+        }
+
+        player.openInventory(inv);
+    }
+
+    private void openPlayerSelector(Player player) {
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        players.remove(player);
+        int size = ((players.size() / 9) + 1) * 9;
+        Inventory inv = Bukkit.createInventory(null, Math.min(54, Math.max(9, size)), miniMessage.deserialize(G_GOLD + toSmallCaps(GUI_TP_SELECT)));
+
+        for (Player p : players) {
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta) head.getItemMeta();
+            meta.setOwningPlayer(p);
+            meta.displayName(miniMessage.deserialize(G_GOLD + p.getName()));
+            head.setItemMeta(meta);
+            inv.addItem(head);
+        }
+        player.openInventory(inv);
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        String title = miniMessage.serialize(event.getView().title());
+        // Clean title for comparison (MiniMessage tags might vary slightly)
+        boolean isMain = title.contains(toSmallCaps(GUI_TP_MAIN));
+        boolean isSelect = title.contains(toSmallCaps(GUI_TP_SELECT));
+
+        if (!isMain && !isSelect) return;
+        event.setCancelled(true);
+
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType() == Material.AIR) return;
+
+        PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
+
+        if (isMain) {
+            int slot = event.getRawSlot();
+            if (slot == 29) { // Charge TP
+                ItemStack cursor = event.getCursor();
+                if (cursor.getType() == Material.DIAMOND && cursor.getAmount() >= 20) {
+                    cursor.setAmount(cursor.getAmount() - 20);
+                    settings.tpCharges++;
+                    player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1f);
+                    openTpMainMenu(player);
+                } else {
+                    player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You need 20 diamonds on your cursor!")));
+                }
+            } else if (slot == 31) { // Use Charge
+                if (settings.tpCharges > 0) openPlayerSelector(player);
+                else player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You have no charges left!")));
+            } else if (slot == 33) { // Create Waypoint
+                ItemStack cursor = event.getCursor();
+                if (cursor.getType() == Material.DIAMOND && cursor.getAmount() >= 30) {
+                    cursor.setAmount(cursor.getAmount() - 30);
+                    String wpName = "waypoint " + (settings.waypoints.size() + 1);
+                    settings.waypoints.put(wpName, player.getLocation().clone());
+                    player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1f, 1.2f);
+                    player.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Created permanent ") + wpName));
+                    openTpMainMenu(player);
+                } else {
+                    player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You need 30 diamonds on your cursor!")));
+                }
+            } else if (slot >= 36 && slot <= 53) { // Click Waypoint
+                if (clicked.getType() == Material.COMPASS) {
+                    if (settings.tpCharges >= 5) {
+                        String name = miniMessage.serialize(clicked.getItemMeta().displayName());
+                        // Extract name from gradient if needed, or just look up by slot order
+                        int index = slot - 36;
+                        if (index < settings.waypoints.size()) {
+                            String key = new ArrayList<>(settings.waypoints.keySet()).get(index);
+                            Location loc = settings.waypoints.get(key);
+                            settings.tpCharges -= 5;
+                            player.teleport(loc);
+                            player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                            player.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Teleported to ") + key));
+                            player.closeInventory();
+                        }
+                    } else {
+                        player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You need 5 charges to use a waypoint!")));
+                    }
+                }
+            }
+        } else if (isSelect) {
+            if (clicked.getType() == Material.PLAYER_HEAD) {
+                SkullMeta meta = (SkullMeta) clicked.getItemMeta();
+                if (meta.getOwningPlayer() != null && meta.getOwningPlayer().getName() != null) {
+                    Player target = Bukkit.getPlayer(meta.getOwningPlayer().getUniqueId());
+                    if (target != null) {
+                        tpRequests.put(target.getUniqueId(), player.getUniqueId());
+                        target.sendMessage(miniMessage.deserialize(G_GOLD + toSmallCaps(player.getName() + " wants to teleport to you!")));
+                        target.sendMessage(miniMessage.deserialize(C_YELLOW + toSmallCaps("Use /tp accept or /tp deny")));
+                        player.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Teleport request sent to " + target.getName())));
+                        player.closeInventory();
+                    }
+                }
+            }
+        }
+    }
+
+    private void handleTpResponse(CommandSourceStack source, boolean accept) {
+        if (!(source.getSender() instanceof Player target)) {
+            source.getSender().sendPlainMessage("ᴘʟᴀʏᴇʀѕ ᴏɴʟʏ.");
+            return;
+        }
+
+        UUID requesterId = tpRequests.remove(target.getUniqueId());
+        if (requesterId == null) {
+            target.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("No pending teleport requests.")));
+            return;
+        }
+
+        Player requester = Bukkit.getPlayer(requesterId);
+        if (requester == null) {
+            target.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Requester is no longer online.")));
+            return;
+        }
+
+        if (accept) {
+            PlayerSettings reqSettings = playerSettings.get(requesterId);
+            if (reqSettings != null && reqSettings.tpCharges > 0) {
+                reqSettings.tpCharges--;
+                requester.teleport(target.getLocation());
+                requester.playSound(requester.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                requester.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Teleport request accepted!")));
+                target.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Teleporting " + requester.getName() + " to you.")));
+            } else {
+                target.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Requester no longer has enough charges.")));
+                requester.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Teleport failed: No charges left.")));
+            }
+        } else {
+            target.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Teleport request denied.")));
+            requester.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps(target.getName() + " denied your teleport request.")));
+        }
+    }
+
+    private ItemStack createItem(Material material, String name, String... lore) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(miniMessage.deserialize(name));
+        List<Component> loreList = new ArrayList<>();
+        for (String s : lore) loreList.add(miniMessage.deserialize(s));
+        meta.lore(loreList);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     private int toggleSetting(CommandSourceStack source, String type) {
         if (!(source.getSender() instanceof Player player)) {
             source.getSender().sendPlainMessage("ᴘʟᴀʏᴇʀѕ ᴏɴʟʏ.");
@@ -288,6 +523,14 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         Location loc = player.getLocation();
         StringBuilder sb = new StringBuilder();
         if (settings.showXyz) sb.append(C_GOLD).append("<b>🗺</b> ").append(C_ORANGE).append(loc.getBlockX()).append(" ").append(loc.getBlockY()).append(" ").append(loc.getBlockZ()).append(" ");
+
+        if (settings.destination != null && settings.destination.getWorld().equals(player.getWorld())) {
+            double dist = loc.distance(settings.destination);
+            String dir = getDirection(player, settings.destination);
+            if (!sb.isEmpty()) sb.append(C_GRAY).append("| ");
+            sb.append(C_PURPLE).append("🎯 ").append(C_ORANGE).append((int)dist).append("m ").append(C_YELLOW).append(dir).append(" ");
+        }
+
         if (settings.showNetherXyz) {
             World.Environment env = player.getWorld().getEnvironment();
             if (env == World.Environment.NORMAL || env == World.Environment.NETHER) {
@@ -301,6 +544,24 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
             sb.append(C_YELLOW).append("❊ ").append(toSmallCaps(player.getWorld().getBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()).key().value().replace("minecraft:", "").replace("_", " ")));
         }
         if (!sb.isEmpty()) player.sendActionBar(miniMessage.deserialize(sb.toString().trim()));
+    }
+
+    private String getDirection(Player player, Location target) {
+        double angle = Math.toDegrees(Math.atan2(target.getZ() - player.getLocation().getZ(), target.getX() - player.getLocation().getX()));
+        angle = (angle + 360) % 360;
+
+        double playerYaw = (player.getLocation().getYaw() + 90 + 360) % 360;
+        double relativeAngle = (angle - playerYaw + 360) % 360;
+
+        if (relativeAngle > 337.5 || relativeAngle <= 22.5) return "⬆";
+        if (relativeAngle > 22.5 && relativeAngle <= 67.5) return "↗";
+        if (relativeAngle > 67.5 && relativeAngle <= 112.5) return "➡";
+        if (relativeAngle > 112.5 && relativeAngle <= 157.5) return "↘";
+        if (relativeAngle > 157.5 && relativeAngle <= 202.5) return "⬇";
+        if (relativeAngle > 202.5 && relativeAngle <= 247.5) return "↙";
+        if (relativeAngle > 247.5 && relativeAngle <= 292.5) return "⬅";
+        if (relativeAngle > 292.5 && relativeAngle <= 337.5) return "↖";
+        return "⬆";
     }
 
     private String toSmallCaps(String input) {
