@@ -139,15 +139,19 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                     player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Destination cleared!")));
                     return 1;
                 }))
-                .then(Commands.argument("x", io.papermc.paper.command.brigadier.argument.ArgumentTypes.finePosition())
-                    .executes(ctx -> {
-                        if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
-                        io.papermc.paper.math.Position pos = ctx.getArgument("x", io.papermc.paper.math.Position.class);
-                        PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
-                        settings.destination = new Location(player.getWorld(), pos.x(), pos.y(), pos.z());
-                        player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Destination set to ") + (int)pos.x() + ", " + (int)pos.y() + ", " + (int)pos.z()));
-                        return 1;
-                    }));
+                .then(Commands.argument("x", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg())
+                    .then(Commands.argument("y", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg())
+                        .then(Commands.argument("z", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg())
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                                double x = ctx.getArgument("x", Double.class);
+                                double y = ctx.getArgument("y", Double.class);
+                                double z = ctx.getArgument("z", Double.class);
+                                PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
+                                settings.destination = new Location(player.getWorld(), x, y, z);
+                                player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Destination set to ") + (int)x + ", " + (int)y + ", " + (int)z));
+                                return 1;
+                            }))));
 
             commands.register(destBuilder.build(), "Set a navigation destination", List.of("dest"));
         });
