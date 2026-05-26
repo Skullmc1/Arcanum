@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import net.kyori.adventure.text.Component;
@@ -69,6 +71,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         int tpCharges = 0;
         final Map<String, Location> waypoints = new LinkedHashMap<>();
         Location destination = null;
+        UUID trackingPlayer = null;
 
         void toggleGlobal() { globalEnabled = !globalEnabled; }
         void toggleXyz() { showXyz = !showXyz; }
@@ -149,11 +152,39 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                                 double z = ctx.getArgument("z", Double.class);
                                 PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
                                 settings.destination = new Location(player.getWorld(), x, y, z);
+                                settings.trackingPlayer = null; // Clear tracking when destination is set
                                 player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Destination set to ") + (int)x + ", " + (int)y + ", " + (int)z));
                                 return 1;
                             }))));
 
             commands.register(destBuilder.build(), "Set a navigation destination", List.of("dest"));
+
+            var trackBuilder = Commands.literal("track")
+                .then(Commands.literal("clear").executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                    PlayerSettings settings = playerSettings.get(player.getUniqueId());
+                    if (settings != null) settings.trackingPlayer = null;
+                    player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Tracking cleared!")));
+                    return 1;
+                }))
+                .then(Commands.argument("player", ArgumentTypes.player())
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                        PlayerSelectorArgumentResolver selector = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
+                        List<Player> targets = selector.resolve(ctx.getSource());
+                        if (targets.isEmpty()) {
+                            player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Player not found!")));
+                            return 1;
+                        }
+                        Player target = targets.get(0);
+
+                        PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
+                        settings.trackingPlayer = target.getUniqueId();
+                        settings.destination = null; // Clear destination when tracking is set
+                        player.sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("Tracking ") + target.getName()));
+                        return 1;
+                    }));
+            commands.register(trackBuilder.build(), "Track a player's location", List.of());
         });
 
         // Dashboard update task
@@ -284,8 +315,14 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         Player player = event.getEntity();
         Location loc = player.getLocation();
         String worldName = player.getWorld().getName();
-        String deathMsg = String.format("%s☠ %s 📍 <white>%d, %d, %d</white> %s %s",
-            C_PURPLE, toSmallCaps("Death location"), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), toSmallCaps("in"), toSmallCaps(worldName));
+        int x = loc.getBlockX();
+        int y = loc.getBlockY();
+        int z = loc.getBlockZ();
+
+        String command = String.format("/destination %d %d %d", x, y, z);
+        String deathMsg = String.format("%s☠ %s 📍 <white><click:run_command:'%s'><hover:show_text:'%s'>%d, %d, %d</hover></click></white> %s %s",
+            C_PURPLE, toSmallCaps("Death location"), command, toSmallCaps("click to set destination"), x, y, z, toSmallCaps("in"), toSmallCaps(worldName));
+
         player.sendMessage(miniMessage.deserialize(deathMsg));
     }
 
@@ -342,7 +379,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
             C_GRAY + toSmallCaps("click to select a player to teleport to")));
 
         inv.setItem(33, createItem(Material.NAME_TAG, G_GOLD + toSmallCaps("create waypoint"),
-            C_GRAY + toSmallCaps("click with 30 diamonds to save current location")));
+            C_GRAY + toSmallCaps("click with 15 diamonds to save current location")));
 
         // Waypoints in bottom 2 rows (36-53)
         int slot = 36;
@@ -377,14 +414,19 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         String title = miniMessage.serialize(event.getView().title());
-        // Clean title for comparison (MiniMessage tags might vary slightly)
         boolean isMain = title.contains(toSmallCaps(GUI_TP_MAIN));
         boolean isSelect = title.contains(toSmallCaps(GUI_TP_SELECT));
 
         if (!isMain && !isSelect) return;
+
+        // Always cancel the event for our GUIs to prevent item movement
         event.setCancelled(true);
 
         if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        // Only handle clicks in the top inventory
+        if (event.getClickedInventory() != event.getView().getTopInventory()) return;
+
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
 
@@ -407,15 +449,15 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                 else player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You have no charges left!")));
             } else if (slot == 33) { // Create Waypoint
                 ItemStack cursor = event.getCursor();
-                if (cursor.getType() == Material.DIAMOND && cursor.getAmount() >= 30) {
-                    cursor.setAmount(cursor.getAmount() - 30);
+                if (cursor.getType() == Material.DIAMOND && cursor.getAmount() >= 15) {
+                    cursor.setAmount(cursor.getAmount() - 15);
                     String wpName = "waypoint " + (settings.waypoints.size() + 1);
                     settings.waypoints.put(wpName, player.getLocation().clone());
                     player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1f, 1.2f);
                     player.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Created permanent ") + wpName));
                     openTpMainMenu(player);
                 } else {
-                    player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You need 30 diamonds on your cursor!")));
+                    player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You need 15 diamonds on your cursor!")));
                 }
             } else if (slot >= 36 && slot <= 53) { // Click Waypoint
                 if (clicked.getType() == Material.COMPASS) {
@@ -533,6 +575,16 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
             String dir = getDirection(player, settings.destination);
             if (!sb.isEmpty()) sb.append(C_GRAY).append("| ");
             sb.append(C_PURPLE).append("🎯 ").append(C_ORANGE).append((int)dist).append("m ").append(C_YELLOW).append(dir).append(" ");
+        }
+
+        if (settings.trackingPlayer != null) {
+            Player target = Bukkit.getPlayer(settings.trackingPlayer);
+            if (target != null && target.isOnline() && target.getWorld().equals(player.getWorld())) {
+                double dist = loc.distance(target.getLocation());
+                String dir = getDirection(player, target.getLocation());
+                if (!sb.isEmpty()) sb.append(C_GRAY).append("| ");
+                sb.append(C_PURPLE).append("👤 ").append(C_ORANGE).append(target.getName()).append(" ").append((int)dist).append("m ").append(C_YELLOW).append(dir).append(" ");
+            }
         }
 
         if (settings.showNetherXyz) {
