@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "space.qclid"
-version = "1.3"
+version = "1.6"
 
 repositories {
     mavenCentral()

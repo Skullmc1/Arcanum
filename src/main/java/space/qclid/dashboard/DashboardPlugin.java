@@ -72,6 +72,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         final Map<String, Location> waypoints = new LinkedHashMap<>();
         Location destination = null;
         UUID trackingPlayer = null;
+        Location linkedChest = null;
 
         void toggleGlobal() { globalEnabled = !globalEnabled; }
         void toggleXyz() { showXyz = !showXyz; }
@@ -96,7 +97,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                 .then(Commands.literal("biome").executes(ctx -> toggleSetting(ctx.getSource(), "biome")))
                 .then(Commands.literal("nether").executes(ctx -> toggleSetting(ctx.getSource(), "nether")))
                 .then(Commands.literal("update").executes(ctx -> {
-                    checkForUpdates(ctx.getSource());
+                    checkForUpdates(ctx.getSource(), false);
                     return 1;
                 }));
 
@@ -185,29 +186,95 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                         return 1;
                     }));
             commands.register(trackBuilder.build(), "Track a player's location", List.of());
+
+            var linkChestBuilder = Commands.literal("linkchest")
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+
+                    // Check block at feet and block directly below
+                    org.bukkit.block.Block b1 = player.getLocation().getBlock();
+                    org.bukkit.block.Block b2 = player.getLocation().clone().subtract(0, 0.1, 0).getBlock();
+
+                    org.bukkit.block.Block block = null;
+                    if (b1.getType() == Material.CHEST || b1.getType() == Material.TRAPPED_CHEST) block = b1;
+                    else if (b2.getType() == Material.CHEST || b2.getType() == Material.TRAPPED_CHEST) block = b2;
+
+                    if (block == null) {
+                        player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You must be standing on a chest!")));
+                        return 1;
+                    }
+
+                    org.bukkit.block.Chest chest = (org.bukkit.block.Chest) block.getState();
+                    if (chest.getInventory() instanceof org.bukkit.inventory.DoubleChestInventory) {
+                        player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("Only single chests can be linked!")));
+                        return 1;
+                    }
+
+                    PlayerSettings settings = playerSettings.computeIfAbsent(player.getUniqueId(), k -> new PlayerSettings());
+                    settings.linkedChest = block.getLocation();
+                    player.sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("Chest linked successfully!")));
+                    return 1;
+                });
+
+            commands.register(linkChestBuilder.build(), "Link a chest you are standing on", List.of());
+
+            var chestCmdBuilder = Commands.literal("chest")
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                    PlayerSettings settings = playerSettings.get(player.getUniqueId());
+
+                    if (settings == null || settings.linkedChest == null) {
+                        player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("You have no linked chest! Use /linkchest while standing on one.")));
+                        return 1;
+                    }
+
+                    org.bukkit.block.Block block = settings.linkedChest.getBlock();
+                    if (block.getType() != Material.CHEST && block.getType() != Material.TRAPPED_CHEST) {
+                        player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("The linked chest no longer exists!")));
+                        settings.linkedChest = null;
+                        return 1;
+                    }
+
+                    org.bukkit.block.Chest chest = (org.bukkit.block.Chest) block.getState();
+                    if (chest.getInventory() instanceof org.bukkit.inventory.DoubleChestInventory) {
+                        player.sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("The linked chest has become a double chest and is now invalid.")));
+                        settings.linkedChest = null;
+                        return 1;
+                    }
+
+                    player.openInventory(chest.getInventory());
+                    player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 1f, 1f);
+                    return 1;
+                });
+            commands.register(chestCmdBuilder.build(), "Open your linked chest", List.of());
         });
 
         // Dashboard update task
         getServer().getGlobalRegionScheduler().runAtFixedRate(this, scheduledTask -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 updateActionBar(player);
+                spawnNavigationParticles(player);
             }
         }, 1L, 5L);
 
-        // Check for updates on startup
-        checkForUpdates(null);
+        // Check for updates every 5 minutes (6000 ticks)
+        getServer().getGlobalRegionScheduler().runAtFixedRate(this, scheduledTask -> {
+            checkForUpdates(null, true);
+        }, 1L, 6000L);
     }
 
     /**
      * Checks for updates from the web.
      */
-    private void checkForUpdates(CommandSourceStack source) {
+    private void checkForUpdates(CommandSourceStack source, boolean quiet) {
+        if (pendingUpdateFile != null) return;
+
         String updateUrl = "https://www.qclid.space/api/plugin-version";
         String startMsg = "Checking for updates...";
         String failMsg = "Updating failed, will try again next time server restarts.";
 
         if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GOLD + toSmallCaps("[Dashboard] " + startMsg)));
-        else getLogger().info(startMsg);
+        else if (!quiet) getLogger().info(startMsg);
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(updateUrl)).GET().build();
@@ -215,7 +282,7 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
             if (response.statusCode() != 200) {
                 if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("[Dashboard] " + failMsg)));
-                else getLogger().warning(failMsg);
+                else if (!quiet) getLogger().warning(failMsg);
                 return;
             }
 
@@ -233,11 +300,11 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
                 } else {
                     String upToDateMsg = "Plugin is up to date!";
                     if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_GREEN + toSmallCaps("[Dashboard] " + upToDateMsg)));
-                    else getLogger().info(upToDateMsg);
+                    else if (!quiet) getLogger().info(upToDateMsg);
                 }
             } catch (Exception e) {
                 if (source != null) source.getSender().sendMessage(miniMessage.deserialize(C_RED + toSmallCaps("[Dashboard] " + failMsg)));
-                else getLogger().warning(failMsg + " (" + e.getMessage() + ")");
+                else if (!quiet) getLogger().warning(failMsg + " (" + e.getMessage() + ")");
             }
         });
     }
@@ -352,8 +419,10 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
 
     private void sharePosition(Player player) {
         Location loc = player.getLocation();
-        String posMsg = String.format("%s🗺 %s %s %s 📍 <white>%d, %d, %d</white> %s %s",
-            C_GOLD, player.getName(), C_ORANGE, toSmallCaps("is at"), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), toSmallCaps("in"), toSmallCaps(player.getWorld().getName()));
+        String trackCmd = "/track " + player.getName();
+        String posMsg = String.format("%s🗺 %s %s %s 📍 <white>%d, %d, %d</white> %s %s <gray>[<click:run_command:'%s'><hover:show_text:'%s'><aqua>%s</aqua></hover></click>]",
+            C_GOLD, player.getName(), C_ORANGE, toSmallCaps("is at"), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), toSmallCaps("in"), toSmallCaps(player.getWorld().getName()),
+            trackCmd, toSmallCaps("click to track player"), toSmallCaps("track"));
         Bukkit.broadcast(miniMessage.deserialize(posMsg));
     }
 
@@ -561,6 +630,32 @@ public class DashboardPlugin extends JavaPlugin implements Listener {
         player.sendMessage(miniMessage.deserialize(msg));
         if (!settings.globalEnabled) player.sendActionBar(Component.empty());
         return 1;
+    }
+
+    private void spawnNavigationParticles(Player player) {
+        PlayerSettings settings = playerSettings.get(player.getUniqueId());
+        if (settings == null) return;
+
+        Location target = null;
+        if (settings.destination != null && settings.destination.getWorld().equals(player.getWorld())) {
+            target = settings.destination;
+        } else if (settings.trackingPlayer != null) {
+            Player tracked = Bukkit.getPlayer(settings.trackingPlayer);
+            if (tracked != null && tracked.isOnline() && tracked.getWorld().equals(player.getWorld())) {
+                target = tracked.getLocation();
+            }
+        }
+
+        if (target != null) {
+            Location playerLoc = player.getEyeLocation().subtract(0, 0.5, 0);
+            org.bukkit.util.Vector direction = target.toVector().subtract(playerLoc.toVector()).normalize();
+
+            // Spawn a small trail of 3 particles starting 1 block in front of the player
+            for (double i = 1.0; i <= 2.0; i += 0.5) {
+                Location particleLoc = playerLoc.clone().add(direction.clone().multiply(i));
+                player.spawnParticle(org.bukkit.Particle.FLAME, particleLoc, 1, 0, 0, 0, 0.02);
+            }
+        }
     }
 
     private void updateActionBar(Player player) {
