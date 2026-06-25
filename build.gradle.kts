@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "space.qclid"
-version = "1.6"
+version = "1.7"
 
 repositories {
     mavenCentral()
@@ -13,23 +13,23 @@ repositories {
 }
 
 dependencies {
-    paperweight.paperDevBundle("26.1.2.build.+")
+    paperweight.paperDevBundle("26.2.build.+")
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(26))
     }
 }
 
 tasks {
     compileJava {
         options.encoding = "UTF-8"
-        options.release.set(25)
+        options.release.set(26)
     }
 
     runServer {
-        minecraftVersion("26.1.2")
+        minecraftVersion("26.2")
         // Suppress sun.misc.Unsafe warnings from JOML (JEP 471)
         jvmArgs("-Djoml.nounsafe", "--sun-misc-unsafe-memory-access=allow")
     }

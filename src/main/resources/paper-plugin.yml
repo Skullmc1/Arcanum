@@ -1,6 +1,6 @@
 name: Dashboard
-version: "1.6"
+version: "1.7"
 main: space.qclid.dashboard.DashboardPlugin
-api-version: "26.1.2"
+api-version: "26.2"
 description: "Displays coordinates and other useful info in the action bar."
 author: "Qclid"
