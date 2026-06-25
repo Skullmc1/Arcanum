@@ -17,10 +17,12 @@ import static space.qclid.dashboard.util.TextUtil.*;
  */
 public class ActionBarFeature {
 
+    private final JavaPlugin plugin;
     private final DataManager data;
     private final UpdateFeature updateFeature;
 
     public ActionBarFeature(JavaPlugin plugin, DataManager data, UpdateFeature updateFeature) {
+        this.plugin        = plugin;
         this.data          = data;
         this.updateFeature = updateFeature;
     }
@@ -33,6 +35,11 @@ public class ActionBarFeature {
             .then(Commands.literal("nether").executes(ctx -> toggleSetting(ctx.getSource(), "nether")))
             .then(Commands.literal("update").executes(ctx -> {
                 updateFeature.checkForUpdates(ctx.getSource(), false);
+                return 1;
+            }))
+            .then(Commands.literal("version").executes(ctx -> {
+                String version = plugin.getDescription().getVersion();
+                ctx.getSource().getSender().sendMessage(MM.deserialize(C_GOLD + toSmallCaps("[Dashboard] Version: ") + C_YELLOW + version));
                 return 1;
             }));
         commands.register(builder.build(), "Control the dashboard", java.util.List.of("db"));

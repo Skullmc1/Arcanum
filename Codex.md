@@ -13,6 +13,11 @@ Machines used to craft custom items. These are built as physical block structure
 * **Structures / Machines**:
   * **Arcana Table**: Used for infusing items and crafting runes.
   * **Heavy Forge**: Used for forging heavy explorer gear and advanced alloys.
+  * **Upgrade Table**: Used to upgrade and combine items (such as runes).
+  * **Block Duplicator**: Duplicates building blocks using lava fuel.
+  * **Blood Altar**: Performs dark sacrifice rituals to craft Demonium runes.
+  * **Auto Sifter**: Automatically sifts sand and gravel.
+  * **Auto Smelter**: Automatically smelts ore inputs using fuel.
 
 ### 2. Arcane Category
 Mystical tools, armors, weapons, and custom enchantment runes.
