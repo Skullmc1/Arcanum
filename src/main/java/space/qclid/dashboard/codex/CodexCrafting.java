@@ -281,14 +281,76 @@ public class CodexCrafting {
             }
         }
 
+        int maxLvl = getRuneMaxLevel(effect);
         int nextLevel = lvl + 1;
-        if (nextLevel > 3) return null;
+        if (nextLevel > maxLvl) return null;
 
         String baseId = id;
-        if (baseId.endsWith("_2")) baseId = baseId.substring(0, baseId.length() - 2);
-        else if (baseId.endsWith("_3")) baseId = baseId.substring(0, baseId.length() - 2);
+        if (baseId.matches(".+_\\d+")) {
+            baseId = baseId.substring(0, baseId.lastIndexOf('_'));
+        }
 
         return arcaneItems.createEnchantmentRune(baseId, effect, nextLevel);
+    }
+
+    public void executeBloodAltarCraft(Player player, Dropper dropper, Location dropLoc) {
+        Inventory inv = dropper.getInventory();
+        ItemStack[] contents = inv.getContents();
+
+        boolean empty = true;
+        for (ItemStack item : contents) {
+            if (item != null && item.getType() != Material.AIR) {
+                empty = false;
+                break;
+            }
+        }
+
+        if (empty) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1.0f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The dropper is empty!")));
+            return;
+        }
+
+        for (CodexCategory category : registry.getCategories()) {
+            for (CodexItem item : category.getItems()) {
+                String itemStation = getStationType(item.getCraftingStation());
+                if (itemStation.equals("blood_altar")) {
+                    if (recipeMatches(contents, item)) {
+                        if (!manager.isUnlocked(player.getUniqueId(), item.getId())) {
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+                            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You haven't unlocked this recipe in the Codex!")));
+                            return;
+                        }
+
+                        consumeRecipe(dropper, item);
+                        dropLoc.getWorld().dropItemNaturally(dropLoc, item.getDisplayItem());
+
+                        // Sacrifice visual effects
+                        dropLoc.getWorld().playSound(dropLoc, Sound.ENTITY_WITHER_SPAWN, 1f, 0.8f);
+                        dropLoc.getWorld().spawnParticle(org.bukkit.Particle.DAMAGE_INDICATOR, dropLoc, 50, 0.5, 0.5, 0.5);
+                        dropLoc.getWorld().spawnParticle(org.bukkit.Particle.FLAME, dropLoc, 30, 0.5, 0.5, 0.5);
+
+                        // Perform health sacrifice
+                        if (player.getWorld().isHardcore()) {
+                            double current = player.getHealth();
+                            double damage = current * 0.90;
+                            double newHealth = Math.max(1.0, current - damage);
+                            player.setHealth(newHealth);
+                            player.damage(0.01); // flash red
+                            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The altar demands blood! You survive by a thread...")));
+                        } else {
+                            player.setHealth(0.0); // sacrifice
+                            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The altar has claimed your soul as sacrifice!")));
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // No recipe matched
+        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1.0f);
+        player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Invalid demonic recipe! Check the Codex for correct layouts.")));
     }
 
     private String getStationType(ItemStack station) {
@@ -311,6 +373,190 @@ public class CodexCrafting {
         if (id.equals("machinery.arcana_table")) return "arcane_table";
         if (id.equals("machinery.heavy_forge")) return "heavy_forge";
         if (id.equals("machinery.upgrade_table")) return "upgrade_table";
+        if (id.equals("machinery.blood_altar")) return "blood_altar";
         return "none";
+    }
+
+    public void executeBlockDuplicatorCraft(Player player, Block fenceBlock, Dropper dropper) {
+        if (!manager.isUnlocked(player.getUniqueId(), "machinery.block_duplicator")) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You haven't unlocked the Block Duplicator in the Codex!")));
+            return;
+        }
+
+        Inventory inv = dropper.getInventory();
+        ItemStack[] contents = inv.getContents();
+
+        List<Integer> validSlots = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            ItemStack item = contents[i];
+            if (item != null && item.getAmount() >= 1 && isValidBuildingBlock(item)) {
+                validSlots.add(i);
+            }
+        }
+
+        if (validSlots.isEmpty()) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("No valid building blocks found in the dropper!")));
+            return;
+        }
+
+        int N = validSlots.size();
+        int requiredLava = (N + 1) / 2;
+
+        // Find adjacent furnaces/blast furnaces (North, South, East, West relative to the dropper block)
+        BlockFace[] horizontalFaces = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+        List<org.bukkit.block.Furnace> adjacentFurnaces = new ArrayList<>();
+        for (BlockFace face : horizontalFaces) {
+            Block adjBlock = dropper.getBlock().getRelative(face);
+            if (adjBlock.getState() instanceof org.bukkit.block.Furnace furnace) {
+                adjacentFurnaces.add(furnace);
+            }
+        }
+
+        int availableLava = 0;
+        for (org.bukkit.block.Furnace furnace : adjacentFurnaces) {
+            Inventory furnaceInv = furnace.getInventory();
+            for (ItemStack item : furnaceInv.getContents()) {
+                if (item != null && item.getType() == Material.LAVA_BUCKET) {
+                    availableLava += item.getAmount();
+                }
+            }
+        }
+
+        if (availableLava < requiredLava) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Insufficient fuel! Requires " + requiredLava + " Lava Buckets in adjacent furnaces/blast furnaces (found " + availableLava + ").")));
+            return;
+        }
+
+        // Consume lava buckets
+        int lavaToConsume = requiredLava;
+        for (org.bukkit.block.Furnace furnace : adjacentFurnaces) {
+            if (lavaToConsume <= 0) break;
+            Inventory furnaceInv = furnace.getInventory();
+            ItemStack[] fContents = furnaceInv.getContents();
+            boolean changed = false;
+            for (int i = 0; i < fContents.length; i++) {
+                ItemStack item = fContents[i];
+                if (item != null && item.getType() == Material.LAVA_BUCKET) {
+                    int amount = item.getAmount();
+                    if (amount <= lavaToConsume) {
+                        lavaToConsume -= amount;
+                        // Replace with empty buckets
+                        furnaceInv.setItem(i, new ItemStack(Material.BUCKET, amount));
+                        changed = true;
+                    } else {
+                        item.setAmount(amount - lavaToConsume);
+                        furnaceInv.setItem(i, item);
+                        ItemStack emptyBuckets = new ItemStack(Material.BUCKET, lavaToConsume);
+                        java.util.Map<Integer, ItemStack> leftover = furnaceInv.addItem(emptyBuckets);
+                        for (ItemStack drop : leftover.values()) {
+                            furnace.getLocation().getWorld().dropItemNaturally(furnace.getLocation(), drop);
+                        }
+                        lavaToConsume = 0;
+                        changed = true;
+                    }
+                    if (lavaToConsume <= 0) break;
+                }
+            }
+            if (changed) {
+                furnace.update();
+            }
+        }
+
+        // Duplicate building blocks
+        Location dropLoc = fenceBlock.getLocation().add(0.5, 1.2, 0.5);
+        for (int slotIndex : validSlots) {
+            ItemStack itemInDropper = inv.getItem(slotIndex);
+            if (itemInDropper != null && itemInDropper.getAmount() >= 1 && isValidBuildingBlock(itemInDropper)) {
+                // Drop a full stack of cloned item
+                ItemStack duplicatedStack = itemInDropper.clone();
+                duplicatedStack.setAmount(64);
+                dropLoc.getWorld().dropItemNaturally(dropLoc, duplicatedStack);
+
+                // Consume 1 item from dropper slot
+                int newAmount = itemInDropper.getAmount() - 1;
+                if (newAmount <= 0) {
+                    inv.setItem(slotIndex, null);
+                } else {
+                    itemInDropper.setAmount(newAmount);
+                    inv.setItem(slotIndex, itemInDropper);
+                }
+            }
+        }
+
+        // Play sound and spawn smoke & flame particles
+        dropLoc.getWorld().playSound(dropLoc, Sound.BLOCK_BEACON_POWER_SELECT, 1f, 1f);
+        dropLoc.getWorld().spawnParticle(org.bukkit.Particle.FLAME, dropLoc, 30, 0.5, 0.5, 0.5, 0.05);
+        dropLoc.getWorld().spawnParticle(org.bukkit.Particle.SMOKE, dropLoc, 20, 0.5, 0.5, 0.5, 0.05);
+        player.sendActionBar(MM.deserialize(C_GREEN + toSmallCaps("Duplicated " + N + " stacks of blocks!")));
+    }
+
+    public boolean isValidBuildingBlock(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return false;
+        Material material = item.getType();
+        if (!material.isBlock()) return false;
+        if (!material.isSolid()) return false;
+        if (material.isInteractable()) return false;
+
+        String name = material.name();
+        if (name.contains("SHULKER_BOX")) return false;
+        if (name.contains("ORE")) return false;
+
+        // Exclude raw metal blocks
+        if (material == Material.RAW_IRON_BLOCK || material == Material.RAW_GOLD_BLOCK || material == Material.RAW_COPPER_BLOCK) return false;
+
+        // Exclude valuable mineral blocks
+        if (material == Material.DIAMOND_BLOCK || material == Material.EMERALD_BLOCK || material == Material.NETHERITE_BLOCK 
+            || material == Material.GOLD_BLOCK || material == Material.IRON_BLOCK || material == Material.LAPIS_BLOCK 
+            || material == Material.REDSTONE_BLOCK || material == Material.COAL_BLOCK || material == Material.COPPER_BLOCK) return false;
+
+        // Exclude spawners
+        if (material == Material.SPAWNER) return false;
+
+        // Exclude obsidian
+        if (material == Material.OBSIDIAN || material == Material.CRYING_OBSIDIAN) return false;
+
+        // Exclude bedrock, barriers, command blocks, structure blocks, light blocks, jigsaw, structure voids
+        if (material == Material.BEDROCK || material == Material.BARRIER || material == Material.COMMAND_BLOCK 
+            || material == Material.CHAIN_COMMAND_BLOCK || material == Material.REPEATING_COMMAND_BLOCK 
+            || material == Material.STRUCTURE_BLOCK || material == Material.JIGSAW || material == Material.LIGHT) return false;
+
+        return true;
+    }
+
+    public int getRuneMaxLevel(String effect) {
+        if (effect == null) return 1;
+        switch (effect.toLowerCase()) {
+            case "lifesteal": return 3;
+            case "speed": return 3;
+            case "catch_flame": return 3;
+            case "demonium": return 3;
+            case "corrosive_slash": return 4;
+            case "scorch": return 1;
+            case "dwarfs_blessing": return 1;
+            case "glacial_thorns": return 5;
+            case "tidal_sweep": return 3;
+            case "seismic_landing": return 4;
+            case "photosynthesis": return 1;
+            case "zephyr": return 1;
+            case "artemis_blessing": return 1;
+            case "static_charge": return 7;
+            case "phantom_backstab": return 4;
+            case "telekinesis": return 1;
+            case "kinetic_rebound": return 1;
+            case "redirection": return 6;
+            case "bleed": return 8;
+            case "poison_spores": return 5;
+            case "gas_cloud": return 4;
+            case "heavy_draw": return 5;
+            case "timber": return 1;
+            case "soul_harvester": return 1;
+            case "crude_sharpness": return 7;
+            case "basalt_trail": return 1;
+            case "void_walker": return 1;
+            default: return 1;
+        }
     }
 }

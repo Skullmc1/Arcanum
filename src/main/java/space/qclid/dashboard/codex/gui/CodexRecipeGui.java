@@ -56,6 +56,17 @@ public class CodexRecipeGui {
                 ));
                 station.setItemMeta(stationMeta);
             }
+        } else if (item.getCraftingStation() != null && item.getCraftingStation().getType() == Material.ZOMBIE_HEAD) {
+            station = new ItemStack(Material.ZOMBIE_HEAD);
+            ItemMeta stationMeta = station.getItemMeta();
+            if (stationMeta != null) {
+                stationMeta.displayName(parse(C_GOLD + toSmallCaps("Mob Drop")));
+                stationMeta.lore(List.of(
+                        MM.deserialize(C_YELLOW + "<bold>" + toSmallCaps("Requires killing a mob")),
+                        MM.deserialize(C_YELLOW + "<bold>" + toSmallCaps("with lightning."))
+                ));
+                station.setItemMeta(stationMeta);
+            }
         } else {
             station = item.getCraftingStation();
             if (station == null) {

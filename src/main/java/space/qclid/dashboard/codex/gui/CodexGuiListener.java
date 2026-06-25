@@ -94,7 +94,8 @@ public class CodexGuiListener implements Listener {
 
                 String itemId = holder.getSlotMap().get(slot);
                 if (itemId != null) {
-                    if (manager.isUnlocked(player.getUniqueId(), itemId)) {
+                    CodexItem item = registry.getItem(itemId);
+                    if (item != null && (item.isDefaultUnlocked() || manager.isUnlocked(player.getUniqueId(), itemId))) {
                         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
                         CodexRecipeGui.open(player, registry, itemId, holder.getContext(), holder.getPage());
                     } else {

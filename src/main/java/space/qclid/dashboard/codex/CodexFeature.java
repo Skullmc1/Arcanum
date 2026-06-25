@@ -33,7 +33,11 @@ public class CodexFeature {
     private final ExplorerItems explorerItems;
     private final CodexCrafting codexCrafting;
     private final CodexPassiveTask codexPassiveTask;
-    private final CodexListener codexListener;
+    private final CodexCombatListener codexCombatListener;
+    private final CodexInteractionListener codexInteractionListener;
+    private final CodexPlayerListener codexPlayerListener;
+    private final CodexRuneListener codexRuneListener;
+    private final java.util.Map<java.util.UUID, String> activeMachine = new java.util.HashMap<>();
 
     public CodexFeature(JavaPlugin plugin, DataManager dataManager) {
         this.plugin = plugin;
@@ -45,11 +49,18 @@ public class CodexFeature {
         this.arcaneItems = new ArcaneItems(plugin);
         this.explorerItems = new ExplorerItems(plugin);
         this.codexCrafting = new CodexCrafting(plugin, manager, registry, arcaneItems);
-        this.codexPassiveTask = new CodexPassiveTask(plugin);
-        this.codexListener = new CodexListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask);
+        this.codexPassiveTask = new CodexPassiveTask(plugin, arcaneItems);
+        
+        this.codexCombatListener = new CodexCombatListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask);
+        this.codexInteractionListener = new CodexInteractionListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine);
+        this.codexPlayerListener = new CodexPlayerListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine);
+        this.codexRuneListener = new CodexRuneListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine);
 
-        // Register listener
-        plugin.getServer().getPluginManager().registerEvents(codexListener, plugin);
+        // Register listeners
+        plugin.getServer().getPluginManager().registerEvents(codexCombatListener, plugin);
+        plugin.getServer().getPluginManager().registerEvents(codexInteractionListener, plugin);
+        plugin.getServer().getPluginManager().registerEvents(codexPlayerListener, plugin);
+        plugin.getServer().getPluginManager().registerEvents(codexRuneListener, plugin);
 
         // Initialize GUIs listener
         new CodexGuiListener(plugin, registry, manager);
@@ -102,11 +113,13 @@ public class CodexFeature {
         CodexCategory explorerGadgets = new CodexCategory("explorer.gadgets", "explorer", "Gadgets", new ItemStack(Material.LEAD));
         CodexCategory explorerTools = new CodexCategory("explorer.tools", "explorer", "Tools", new ItemStack(Material.IRON_PICKAXE));
         CodexCategory explorerArmor = new CodexCategory("explorer.armor", "explorer", "Armor", new ItemStack(Material.IRON_CHESTPLATE));
+        CodexCategory explorerRunes = new CodexCategory("explorer.runes", "explorer", "Enchantment Runes", new ItemStack(Material.FIREWORK_STAR));
         registry.registerCategory(explorerNavigation);
         registry.registerCategory(explorerExploration);
         registry.registerCategory(explorerGadgets);
         registry.registerCategory(explorerTools);
         registry.registerCategory(explorerArmor);
+        registry.registerCategory(explorerRunes);
 
         // 1. Arcana Table
         CodexItem arcanaTableCodex = new CodexItem.Builder("machinery.arcana_table")
@@ -159,9 +172,28 @@ public class CodexFeature {
                 .build();
         machineryStations.addItem(upgradeTableCodex);
 
-        // 4. Lifesteal Rune I
+        // Block Duplicator
+        CodexItem blockDuplicatorCodex = new CodexItem.Builder("machinery.block_duplicator")
+                .displayName("Block Duplicator")
+                .displayItem(explorerItems.blockDuplicatorItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.NETHER_BRICK_FENCE, 1))
+                .requires(new ItemStack(Material.DROPPER, 1))
+                .requires(new ItemStack(Material.FURNACE, 2))
+                .requires(new ItemStack(Material.BLAST_FURNACE, 1))
+                .description("Structure: Nether Brick Fence on top of a Dropper surrounded horizontally by Furnaces/Blast Furnaces. Duplicates building blocks placed in the dropper using Lava Buckets placed in the furnaces/blast furnaces (1 bucket per 2 stacks).")
+                .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
+                .recipe(
+                        null, new ItemStack(Material.NETHER_BRICK_FENCE), null,
+                        new ItemStack(Material.FURNACE), new ItemStack(Material.DROPPER), new ItemStack(Material.BLAST_FURNACE),
+                        null, new ItemStack(Material.FURNACE), null
+                )
+                .build();
+        machineryStations.addItem(blockDuplicatorCodex);
+
+        // 4. Vampiric Bleed Rune I
         CodexItem lifestealRuneCodex = new CodexItem.Builder("arcane.lifesteal_rune")
-                .displayName("Lifesteal Rune I")
+                .displayName("Vampiric Bleed Rune I")
                 .displayItem(arcaneItems.lifestealRuneItem)
                 .xpCost(8)
                 .requires(new ItemStack(Material.FIREWORK_STAR, 1))
@@ -170,41 +202,41 @@ public class CodexFeature {
                 .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
                         new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK),
-                        new ItemStack(Material.IRON_SWORD), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.DIAMOND_SWORD),
+                        new ItemStack(Material.IRON_SWORD), arcaneItems.bloodItem, new ItemStack(Material.DIAMOND_SWORD),
                         new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK)
                 )
                 .build();
         arcaneRunes.addItem(lifestealRuneCodex);
 
-        // Lifesteal Rune II
+        // Vampiric Bleed Rune II
         ItemStack lifestealRune2Item = arcaneItems.createLifestealRuneOfLevel(2);
         CodexItem lifestealRune2Codex = new CodexItem.Builder("arcane.lifesteal_rune_2")
-                .displayName("Lifesteal Rune II")
+                .displayName("Vampiric Bleed Rune II")
                 .displayItem(lifestealRune2Item)
                 .xpCost(12)
                 .requires(arcaneItems.lifestealRuneItem)
-                .description("Upgraded Lifesteal Rune. Heals you on hit (increased effect).")
+                .description("Upgraded Vampiric Bleed Rune. Heals you on hit (increased effect).")
                 .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
                         new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK),
-                        new ItemStack(Material.IRON_SWORD), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.DIAMOND_SWORD),
+                        new ItemStack(Material.IRON_SWORD), arcaneItems.bloodItem, new ItemStack(Material.DIAMOND_SWORD),
                         new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK)
                 )
                 .build();
         arcaneRunes.addItem(lifestealRune2Codex);
 
-        // Lifesteal Rune III
+        // Vampiric Bleed Rune III
         ItemStack lifestealRune3Item = arcaneItems.createLifestealRuneOfLevel(3);
         CodexItem lifestealRune3Codex = new CodexItem.Builder("arcane.lifesteal_rune_3")
-                .displayName("Lifesteal Rune III")
+                .displayName("Vampiric Bleed Rune III")
                 .displayItem(lifestealRune3Item)
                 .xpCost(16)
                 .requires(lifestealRune2Item)
-                .description("Maximum level Lifesteal Rune.")
+                .description("Maximum level Vampiric Bleed Rune.")
                 .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
                         new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK),
-                        new ItemStack(Material.IRON_SWORD), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.DIAMOND_SWORD),
+                        new ItemStack(Material.IRON_SWORD), arcaneItems.bloodItem, new ItemStack(Material.DIAMOND_SWORD),
                         new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK)
                 )
                 .build();
@@ -1069,10 +1101,367 @@ public class CodexFeature {
                 .build();
         explorerTools.addItem(drill);
 
+        // 48. Wand of Levitation
+        CodexItem wandOfLevitation = new CodexItem.Builder("arcane.ranged.wand_of_levitation")
+                .displayName("Wand of Levitation")
+                .displayItem(arcaneItems.wandOfLevitationItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.SHULKER_SHELL, 1))
+                .description("Shoots a levitation bolt. Targets hit are given Levitation I for 5 seconds. Cooldown: 15 seconds.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.SHULKER_SHELL), new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.SHULKER_SHELL),
+                        new ItemStack(Material.FEATHER), new ItemStack(Material.BLAZE_ROD), new ItemStack(Material.FEATHER),
+                        new ItemStack(Material.FEATHER), new ItemStack(Material.BLAZE_ROD), new ItemStack(Material.FEATHER)
+                )
+                .build();
+        arcaneRanged.addItem(wandOfLevitation);
+
+        // 49. Gale Chestplate
+        CodexItem galeChestplate = new CodexItem.Builder("arcane.armor.gale_chestplate")
+                .displayName("Gale Chestplate")
+                .displayItem(arcaneItems.galeChestplateItem)
+                .xpCost(18)
+                .requires(new ItemStack(Material.PHANTOM_MEMBRANE, 2))
+                .description("Gives permanent Slow Falling I while worn. Allows double jumping.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.PHANTOM_MEMBRANE), new ItemStack(Material.DIAMOND_CHESTPLATE), new ItemStack(Material.PHANTOM_MEMBRANE),
+                        new ItemStack(Material.FEATHER), new ItemStack(Material.EMERALD), new ItemStack(Material.FEATHER),
+                        new ItemStack(Material.FEATHER), new ItemStack(Material.FEATHER), new ItemStack(Material.FEATHER)
+                )
+                .build();
+        arcaneArmor.addItem(galeChestplate);
+
+        // 50. Siphon Blade
+        CodexItem siphonBlade = new CodexItem.Builder("arcane.melee.siphon_blade")
+                .displayName("Siphon Blade")
+                .displayItem(arcaneItems.siphonBladeItem)
+                .xpCost(25)
+                .requires(new ItemStack(Material.NETHER_STAR, 1))
+                .description("Diamond sword that restores 15% of your max health upon killing an enemy.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.NETHER_STAR), new ItemStack(Material.DIAMOND_SWORD), new ItemStack(Material.NETHER_STAR),
+                        new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.SOUL_SAND), new ItemStack(Material.GHAST_TEAR),
+                        new ItemStack(Material.REDSTONE), new ItemStack(Material.REDSTONE), new ItemStack(Material.REDSTONE)
+                )
+                .build();
+        arcaneMelee.addItem(siphonBlade);
+
+        // 51. Waypoint Teleport Plate
+        CodexItem teleportationPlate = new CodexItem.Builder("explorer.navigation.teleportation_plate")
+                .displayName("Waypoint Teleport Plate")
+                .displayItem(explorerItems.teleportationPlateItem)
+                .xpCost(14)
+                .requires(new ItemStack(Material.ENDER_EYE, 1))
+                .description("Right-click the placed plate with a Waypoint Compass to link. Teleports players who stand on it to linked waypoint.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.HEAVY_WEIGHTED_PRESSURE_PLATE), new ItemStack(Material.ENDER_PEARL),
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.IRON_INGOT),
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT)
+                )
+                .build();
+        explorerNavigation.addItem(teleportationPlate);
+
+        // 52. Slime Boots
+        CodexItem slimeBoots = new CodexItem.Builder("explorer.gadgets.slime_boots")
+                .displayName("Slime Boots")
+                .displayItem(explorerItems.slimeBootsItem)
+                .xpCost(10)
+                .requires(new ItemStack(Material.SLIME_BALL, 1))
+                .description("Negates all fall damage and bounces the wearer upward.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.SLIME_BALL), null, new ItemStack(Material.SLIME_BALL),
+                        new ItemStack(Material.SLIME_BLOCK), null, new ItemStack(Material.SLIME_BLOCK),
+                        new ItemStack(Material.IRON_BOOTS), null, new ItemStack(Material.IRON_BOOTS)
+                )
+                .build();
+        explorerGadgets.addItem(slimeBoots);
+
+        // 53. Ore Scanner
+        CodexItem oreScanner = new CodexItem.Builder("explorer.exploration.ore_scanner")
+                .displayName("Ore Scanner")
+                .displayItem(explorerItems.oreScannerItem)
+                .xpCost(12)
+                .requires(new ItemStack(Material.AMETHYST_SHARD, 4))
+                .description("Right-click to highlight nearby valuable ores in a 10-block radius.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.AMETHYST_SHARD), new ItemStack(Material.SPYGLASS), new ItemStack(Material.AMETHYST_SHARD),
+                        new ItemStack(Material.GOLD_INGOT), new ItemStack(Material.REDSTONE), new ItemStack(Material.GOLD_INGOT),
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT)
+                )
+                .build();
+        explorerExploration.addItem(oreScanner);
+
+        // 54. Magnetic Ring
+        CodexItem magneticRing = new CodexItem.Builder("explorer.gadgets.magnetic_ring")
+                .displayName("Magnetic Ring")
+                .displayItem(explorerItems.magneticRingItem)
+                .xpCost(8)
+                .requires(new ItemStack(Material.IRON_INGOT, 4))
+                .description("Attracts dropped items within a 5-block radius when held in inventory.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.GOLD_NUGGET), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.GOLD_NUGGET),
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.REDSTONE), new ItemStack(Material.IRON_INGOT),
+                        new ItemStack(Material.GOLD_NUGGET), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.GOLD_NUGGET)
+                )
+                .build();
+        explorerGadgets.addItem(magneticRing);
+
+        // 1. Lightning Essence
+        CodexItem lightningEssence = new CodexItem.Builder("arcane.materials.lightning_essence")
+                .displayName("Lightning Essence")
+                .displayItem(arcaneItems.lightningEssenceItem)
+                .xpCost(1)
+                .defaultUnlocked(true)
+                .description("A crackling trace of pure lightning.")
+                .craftingStation(new ItemStack(Material.ZOMBIE_HEAD))
+                .recipe(
+                        null, null, null,
+                        null, null, null,
+                        null, null, null
+                )
+                .build();
+        arcaneMaterials.addItem(lightningEssence);
+
+        // 2. Bottle of Lightning
+        CodexItem bottleOfLightning = new CodexItem.Builder("explorer.gadgets.bottle_of_lightning")
+                .displayName("Bottle of Lightning")
+                .displayItem(explorerItems.bottleOfLightningItem)
+                .xpCost(8)
+                .requires(arcaneItems.lightningEssenceItem)
+                .description("A bottle filled with raw electrical current.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        arcaneItems.lightningEssenceItem, arcaneItems.lightningEssenceItem, arcaneItems.lightningEssenceItem,
+                        arcaneItems.lightningEssenceItem, new ItemStack(Material.GLASS_BOTTLE), arcaneItems.lightningEssenceItem,
+                        arcaneItems.lightningEssenceItem, arcaneItems.lightningEssenceItem, arcaneItems.lightningEssenceItem
+                )
+                .build();
+        explorerGadgets.addItem(bottleOfLightning);
+
+        // 3. Staff of the Stormlord
+        CodexItem staffOfTheStormlord = new CodexItem.Builder("arcane.ranged.staff_of_the_stormlord")
+                .displayName("Staff of the Stormlord")
+                .displayItem(arcaneItems.staffOfTheStormlordItem)
+                .xpCost(20)
+                .requires(explorerItems.bottleOfLightningItem)
+                .description("Calls down a lightning bolt on target block.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        null, explorerItems.bottleOfLightningItem, null,
+                        null, new ItemStack(Material.LIGHTNING_ROD), null,
+                        null, new ItemStack(Material.BLAZE_ROD), null
+                )
+                .build();
+        arcaneRanged.addItem(staffOfTheStormlord);
+
+        // 4. Empty Vial
+        CodexItem emptyVial = new CodexItem.Builder("arcane.materials.empty_vial")
+                .displayName("Empty Vial")
+                .displayItem(arcaneItems.emptyVialItem)
+                .xpCost(5)
+                .requires(new ItemStack(Material.GLASS_BOTTLE))
+                .description("An empty glass container designed to hold player blood.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        null, new ItemStack(Material.REDSTONE), null,
+                        new ItemStack(Material.REDSTONE), new ItemStack(Material.GLASS_BOTTLE), new ItemStack(Material.REDSTONE),
+                        null, new ItemStack(Material.REDSTONE), null
+                )
+                .build();
+        arcaneMaterials.addItem(emptyVial);
+
+        // 5. Blood
+        CodexItem blood = new CodexItem.Builder("arcane.materials.blood")
+                .displayName("Blood")
+                .displayItem(arcaneItems.bloodItem)
+                .xpCost(1)
+                .defaultUnlocked(true)
+                .description("A vial filled with player blood. Extracted from self.")
+                .craftingStation(arcaneItems.emptyVialItem)
+                .recipe(
+                        null, null, null,
+                        null, arcaneItems.emptyVialItem, null,
+                        null, null, null
+                )
+                .build();
+        arcaneMaterials.addItem(blood);
+
+        // 6. Blood Altar
+        CodexItem bloodAltar = new CodexItem.Builder("machinery.blood_altar")
+                .displayName("Blood Altar")
+                .displayItem(arcaneItems.bloodAltarItem)
+                .xpCost(10)
+                .requires(new ItemStack(Material.OBSIDIAN))
+                .description("Structure: Red Carpet on top of Dropper on top of Obsidian.")
+                .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
+                .recipe(
+                        null, new ItemStack(Material.RED_CARPET), null,
+                        null, new ItemStack(Material.DROPPER), null,
+                        null, new ItemStack(Material.OBSIDIAN), null
+                )
+                .build();
+        machineryStations.addItem(bloodAltar);
+
+        // 7. Demonium I
+        CodexItem demoniumI = new CodexItem.Builder("arcane.runes.demonium")
+                .displayName("Demonium Rune I")
+                .displayItem(arcaneItems.demoniumRuneItem)
+                .xpCost(15)
+                .requires(arcaneItems.bloodItem)
+                .description("Apply to helmet. Burns entities in a 2-block radius (2s fire).")
+                .craftingStation(arcaneItems.bloodAltarItem)
+                .recipe(
+                        null, arcaneItems.bloodItem, null,
+                        new ItemStack(Material.WITHER_SKELETON_SKULL), arcaneItems.immolationTotemItem, new ItemStack(Material.WITHER_SKELETON_SKULL),
+                        null, arcaneItems.bloodItem, null
+                )
+                .build();
+        arcaneRunes.addItem(demoniumI);
+
+        // 8. Demonium II
+        CodexItem demoniumII = new CodexItem.Builder("arcane.runes.demonium_2")
+                .displayName("Demonium Rune II")
+                .displayItem(arcaneItems.demoniumRune2Item)
+                .xpCost(20)
+                .requires(arcaneItems.demoniumRuneItem)
+                .description("Apply to helmet. Burns entities in a 2-block radius (5s fire).")
+                .craftingStation(arcaneItems.bloodAltarItem)
+                .recipe(
+                        null, arcaneItems.bloodItem, null,
+                        new ItemStack(Material.WITHER_SKELETON_SKULL), arcaneItems.demoniumRuneItem, new ItemStack(Material.WITHER_SKELETON_SKULL),
+                        null, arcaneItems.bloodItem, null
+                )
+                .build();
+        arcaneRunes.addItem(demoniumII);
+
+        // 9. Demonium III
+        CodexItem demoniumIII = new CodexItem.Builder("arcane.runes.demonium_3")
+                .displayName("Demonium Rune III")
+                .displayItem(arcaneItems.demoniumRune3Item)
+                .xpCost(25)
+                .requires(arcaneItems.demoniumRune2Item)
+                .description("Apply to helmet. Burns entities in a 2-block radius (10s fire).")
+                .craftingStation(arcaneItems.bloodAltarItem)
+                .recipe(
+                        null, arcaneItems.bloodItem, null,
+                        new ItemStack(Material.WITHER_SKELETON_SKULL), arcaneItems.demoniumRune2Item, new ItemStack(Material.WITHER_SKELETON_SKULL),
+                        null, arcaneItems.bloodItem, null
+                )
+                .build();
+        arcaneRunes.addItem(demoniumIII);
+
+        // 10. Ender Backpack
+        CodexItem enderBackpack = new CodexItem.Builder("explorer.gadgets.ender_backpack")
+                .displayName("Ender Backpack")
+                .displayItem(explorerItems.enderBackpackItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.ENDER_CHEST))
+                .description("Access ender chest remotely from anywhere.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.LEATHER), new ItemStack(Material.LEATHER), new ItemStack(Material.LEATHER),
+                        arcaneItems.echoingCore, new ItemStack(Material.ENDER_CHEST), arcaneItems.echoingCore,
+                        new ItemStack(Material.LEATHER), new ItemStack(Material.LEATHER), new ItemStack(Material.LEATHER)
+                )
+                .build();
+        explorerGadgets.addItem(enderBackpack);
+
+        // 11. Safari Lasso
+        CodexItem safariLasso = new CodexItem.Builder("explorer.gadgets.safari_lasso")
+                .displayName("Safari Lasso")
+                .displayItem(explorerItems.safariLassoItem)
+                .xpCost(12)
+                .requires(new ItemStack(Material.LEAD))
+                .description("Captures and releases passive mobs.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.STRING), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.STRING),
+                        new ItemStack(Material.GOLD_INGOT), new ItemStack(Material.LEAD), new ItemStack(Material.GOLD_INGOT),
+                        new ItemStack(Material.STRING), new ItemStack(Material.SLIME_BALL), new ItemStack(Material.STRING)
+                )
+                .build();
+        explorerGadgets.addItem(safariLasso);
+
+        // 12. Void Bag
+        CodexItem voidBag = new CodexItem.Builder("explorer.gadgets.void_bag")
+                .displayName("Void Bag")
+                .displayItem(explorerItems.voidBagItem)
+                .xpCost(10)
+                .requires(new ItemStack(Material.CHEST))
+                .description("A portable trash bag that voids its contents.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.LEATHER), new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.LEATHER),
+                        new ItemStack(Material.OBSIDIAN), new ItemStack(Material.HOPPER), new ItemStack(Material.OBSIDIAN),
+                        new ItemStack(Material.LEATHER), new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.LEATHER)
+                )
+                .build();
+        explorerGadgets.addItem(voidBag);
+
+        // 13. Steam Jetpack
+        CodexItem steamJetpack = new CodexItem.Builder("explorer.armor.steam_jetpack")
+                .displayName("Steam Jetpack")
+                .displayItem(explorerItems.steamJetpackItem)
+                .xpCost(20)
+                .requires(new ItemStack(Material.FURNACE))
+                .description("Sneak in mid-air to fly. Consumes coal/charcoal.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.REDSTONE), new ItemStack(Material.FURNACE), new ItemStack(Material.REDSTONE),
+                        arcaneItems.hardenedCoal1, new ItemStack(Material.CHAINMAIL_CHESTPLATE), arcaneItems.hardenedCoal1,
+                        new ItemStack(Material.REDSTONE), new ItemStack(Material.IRON_BLOCK), new ItemStack(Material.REDSTONE)
+                )
+                .build();
+        explorerArmor.addItem(steamJetpack);
+
+        // 14. Auto Sifter
+        CodexItem autoSifter = new CodexItem.Builder("machinery.auto_sifter")
+                .displayName("Auto Sifter")
+                .displayItem(explorerItems.autoSifterItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.HOPPER))
+                .description("Structure: Hopper on top of Dropper with adjacent Cauldron.")
+                .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
+                .recipe(
+                        null, new ItemStack(Material.REDSTONE_BLOCK), null,
+                        new ItemStack(Material.IRON_BLOCK), new ItemStack(Material.HOPPER), new ItemStack(Material.IRON_BLOCK),
+                        null, new ItemStack(Material.CAULDRON), null
+                )
+                .build();
+        machineryStations.addItem(autoSifter);
+
+        // 15. Auto Smelter
+        CodexItem autoSmelter = new CodexItem.Builder("machinery.auto_smelter")
+                .displayName("Auto Smelter")
+                .displayItem(explorerItems.autoSmelterItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.FURNACE))
+                .description("Structure: Hopper on top of Dropper with adjacent Furnace.")
+                .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
+                .recipe(
+                        null, new ItemStack(Material.REDSTONE_BLOCK), null,
+                        new ItemStack(Material.IRON_BLOCK), new ItemStack(Material.FURNACE), new ItemStack(Material.IRON_BLOCK),
+                        null, new ItemStack(Material.HOPPER), null
+                )
+                .build();
+        machineryStations.addItem(autoSmelter);
+
         registerRecipes();
     }
 
     private void registerRecipes() {
+        CodexCategory arcaneIngredients = registry.getCategory("arcane.ingredients");
+        CodexCategory arcaneMaterials = registry.getCategory("arcane.materials");
+        CodexCategory arcaneRunes = registry.getCategory("arcane.runes");
+        CodexCategory explorerRunes = registry.getCategory("explorer.runes");
+
         // 4. Ender Essence Shaped Recipe (Vanilla Crafting Table)
         NamespacedKey enderEssKey = new NamespacedKey(plugin, "recipe_ender_essence");
         if (Bukkit.getRecipe(enderEssKey) == null) {
@@ -1100,6 +1489,447 @@ public class CodexFeature {
             recipe.addIngredient(Material.STRING);
             Bukkit.addRecipe(recipe);
         }
+
+        // Nature's Embrace
+        CodexItem naturesEmbrace = new CodexItem.Builder("arcane.materials.natures_embrace")
+                .displayName("Nature's Embrace")
+                .displayItem(arcaneItems.naturesEmbraceItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.HEART_OF_THE_SEA, 1))
+                .description("A pulsating green orb humming with the raw power of the forest.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.OAK_LEAVES), new ItemStack(Material.SPRUCE_LEAVES), new ItemStack(Material.BIRCH_LEAVES),
+                        new ItemStack(Material.JUNGLE_LEAVES), new ItemStack(Material.HEART_OF_THE_SEA), new ItemStack(Material.ACACIA_LEAVES),
+                        new ItemStack(Material.DARK_OAK_LEAVES), new ItemStack(Material.MANGROVE_LEAVES), new ItemStack(Material.CHERRY_LEAVES)
+                )
+                .build();
+        arcaneIngredients.addItem(naturesEmbrace);
+
+        // Sun's Brilliance
+        CodexItem sunsBrilliance = new CodexItem.Builder("arcane.materials.suns_brilliance")
+                .displayName("Sun's Brilliance")
+                .displayItem(arcaneItems.sunsBrillianceItem)
+                .xpCost(10)
+                .requires(arcaneItems.immolationTotemItem)
+                .description("Solar-charged flower. Obtained by exposing a dropped Immolation Totem to direct sunlight for 10 seconds.")
+                .craftingStation(new ItemStack(Material.SUNFLOWER))
+                .recipe(
+                        null, null, null,
+                        null, arcaneItems.immolationTotemItem, null,
+                        null, null, null
+                )
+                .build();
+        arcaneIngredients.addItem(sunsBrilliance);
+
+        // Blessing of the Void
+        CodexItem blessingVoid = new CodexItem.Builder("explorer.materials.blessing_of_the_void")
+                .displayName("Blessing of the Void")
+                .displayItem(arcaneItems.blessingOfTheVoidItem)
+                .xpCost(25)
+                .requires(new ItemStack(Material.ELYTRA, 1))
+                .description("An ender-encased elytra infused with void warding capabilities.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        arcaneItems.enderEssence, arcaneItems.enderEssence, arcaneItems.enderEssence,
+                        arcaneItems.enderEssence, new ItemStack(Material.ELYTRA), arcaneItems.enderEssence,
+                        arcaneItems.enderEssence, arcaneItems.enderEssence, arcaneItems.enderEssence
+                )
+                .build();
+        arcaneMaterials.addItem(blessingVoid);
+
+        // Resonant Plate
+        CodexItem resonantPlate = new CodexItem.Builder("explorer.materials.resonant_plate")
+                .displayName("Resonant Plate")
+                .displayItem(arcaneItems.resonantPlateItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.SHIELD, 1))
+                .description("A highly elastic metal plate designed to reflect forces.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.REDSTONE), new ItemStack(Material.IRON_INGOT),
+                        new ItemStack(Material.REDSTONE), new ItemStack(Material.SHIELD), new ItemStack(Material.REDSTONE),
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.REDSTONE), new ItemStack(Material.IRON_INGOT)
+                )
+                .build();
+        arcaneMaterials.addItem(resonantPlate);
+
+        // Link Stone
+        CodexItem linkStone = new CodexItem.Builder("arcane.materials.link_stone")
+                .displayName("Link Stone")
+                .displayItem(arcaneItems.linkStoneItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.LEAD, 1))
+                .description("A mystical crystal that binds and redirects connections.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.GOLD_NUGGET), new ItemStack(Material.AMETHYST_SHARD), new ItemStack(Material.GOLD_NUGGET),
+                        new ItemStack(Material.AMETHYST_SHARD), new ItemStack(Material.LEAD), new ItemStack(Material.AMETHYST_SHARD),
+                        new ItemStack(Material.GOLD_NUGGET), new ItemStack(Material.AMETHYST_SHARD), new ItemStack(Material.GOLD_NUGGET)
+                )
+                .build();
+        arcaneIngredients.addItem(linkStone);
+
+        // Poison Vial
+        CodexItem poisonVial = new CodexItem.Builder("arcane.materials.poison_vial")
+                .displayName("Poison Vial")
+                .displayItem(arcaneItems.poisonVialItem)
+                .xpCost(5)
+                .requires(arcaneItems.emptyVialItem)
+                .description("Concentrated venom. Extract from Spiders, Cave Spiders, Bees, or Pufferfish with an Empty Vial.")
+                .craftingStation(arcaneItems.emptyVialItem)
+                .recipe(
+                        null, null, null,
+                        null, arcaneItems.emptyVialItem, null,
+                        null, null, null
+                )
+                .build();
+        arcaneIngredients.addItem(poisonVial);
+
+        // Soul Orb
+        CodexItem soulOrb = new CodexItem.Builder("arcane.materials.soul_orb")
+                .displayName("Soul Orb")
+                .displayItem(arcaneItems.soulOrbItem)
+                .xpCost(10)
+                .requires(new ItemStack(Material.GHAST_TEAR, 1))
+                .description("A swirling orb containing a lost soul. Rare drop from hostile mobs.")
+                .craftingStation(new ItemStack(Material.GHAST_TEAR))
+                .recipe(
+                        null, null, null,
+                        null, new ItemStack(Material.GHAST_TEAR), null,
+                        null, null, null
+                )
+                .build();
+        arcaneIngredients.addItem(soulOrb);
+
+        // Core of Heat
+        CodexItem coreHeat = new CodexItem.Builder("explorer.materials.core_of_heat")
+                .displayName("Core of Heat")
+                .displayItem(arcaneItems.coreOfHeat)
+                .xpCost(10)
+                .requires(new ItemStack(Material.MAGMA_CREAM, 1))
+                .description("An intensely hot orb forged by compressing Magma Blocks and Blaze Powder.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.MAGMA_BLOCK), new ItemStack(Material.MAGMA_BLOCK), new ItemStack(Material.MAGMA_BLOCK),
+                        new ItemStack(Material.BLAZE_POWDER), new ItemStack(Material.MAGMA_BLOCK), new ItemStack(Material.BLAZE_POWDER),
+                        new ItemStack(Material.MAGMA_BLOCK), new ItemStack(Material.MAGMA_BLOCK), new ItemStack(Material.MAGMA_BLOCK)
+                )
+                .build();
+        arcaneMaterials.addItem(coreHeat);
+
+        ItemStack book = new ItemStack(Material.BOOK);
+        ItemStack enchBook = new ItemStack(Material.ENCHANTED_BOOK);
+
+        // 1. Corrosive Slash (Axe - Max 4)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.corrosive_slash", "Corrosive Slash", "corrosive_slash", "WEAPON_AXE", 4, 
+                "Reduces enemy armor toughness rating on axe hits. Level scales duration up to 10s at Level 4 (5 max stacks).", 
+                org.bukkit.Color.fromRGB(85, 107, 47), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, new ItemStack(Material.SPIDER_EYE), book,
+                        new ItemStack(Material.PUFFERFISH), new ItemStack(Material.WITHER_SKELETON_SKULL), new ItemStack(Material.PUFFERFISH),
+                        book, new ItemStack(Material.SPIDER_EYE), book
+                }, arcaneItems.arcanaTableItem);
+
+        // 2. Scorch (Sword - Max 1)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.scorch", "Scorch", "scorch", "WEAPON_SWORD", 1, 
+                "Reduces enemy armor on sword hits (stacks up to 10, max 90%). Deals 1 tick of fire damage on hit. No levels.", 
+                org.bukkit.Color.fromRGB(255, 69, 0), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, new ItemStack(Material.MAGMA_CREAM), enchBook,
+                        new ItemStack(Material.SPIDER_EYE), new ItemStack(Material.LAVA_BUCKET), new ItemStack(Material.SPIDER_EYE),
+                        enchBook, new ItemStack(Material.MAGMA_CREAM), enchBook
+                }, arcaneItems.arcanaTableItem);
+
+        // 3. Dwarf's Blessing (Tools - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.dwarfs_blessing", "Dwarf's Blessing", "dwarfs_blessing", "TOOLS", 1, 
+                "Automatically smelts all mined blocks. Breaking logs drops Charcoal instead of wood.", 
+                org.bukkit.Color.fromRGB(139, 69, 19), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, new ItemStack(Material.BLAST_FURNACE), enchBook,
+                        null, new ItemStack(Material.BLAST_FURNACE), null,
+                        enchBook, new ItemStack(Material.BLAST_FURNACE), enchBook
+                }, explorerItems.heavyForgeItem);
+
+        // 4. Glacial Thorns (Armor - Max 5)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.glacial_thorns", "Glacial Thorns", "glacial_thorns", "ARMOR", 5, 
+                "Enemies hitting you have a chance to be afflicted with Weakness. Level 5 guarantees Weakness II.", 
+                org.bukkit.Color.fromRGB(0, 191, 255), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, null, book,
+                        new ItemStack(Material.BLUE_ICE, 4), new ItemStack(Material.PUFFERFISH), new ItemStack(Material.BLUE_ICE, 4),
+                        book, null, book
+                }, arcaneItems.arcanaTableItem);
+
+        // 5. Tidal Sweep (Swords - Max 3)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.tidal_sweep", "Tidal Sweep", "tidal_sweep", "WEAPON_SWORD", 3, 
+                "Unleashes a larger, longer-reaching sweep with a narrower angle. Incompatible with Sweeping Edge.", 
+                org.bukkit.Color.fromRGB(30, 144, 255), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, new ItemStack(Material.PRISMARINE_SHARD), book,
+                        new ItemStack(Material.PRISMARINE_SHARD), new ItemStack(Material.HEART_OF_THE_SEA), new ItemStack(Material.PRISMARINE_SHARD),
+                        book, new ItemStack(Material.KELP), book
+                }, arcaneItems.arcanaTableItem);
+
+        // 6. Seismic Landing (Boots - Max 4)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.seismic_landing", "Seismic Landing", "seismic_landing", "ARMOR_BOOTS", 4, 
+                "Negates up to 5 hearts of fall damage, releasing a massive damage/launch shockwave. Incompatible with Feather Falling.", 
+                org.bukkit.Color.fromRGB(112, 128, 144), org.bukkit.FireworkEffect.Type.BALL, 12,
+                new ItemStack[]{
+                        book, new ItemStack(Material.POINTED_DRIPSTONE), book,
+                        new ItemStack(Material.POINTED_DRIPSTONE), arcaneItems.naturesEmbraceItem, new ItemStack(Material.POINTED_DRIPSTONE),
+                        book, new ItemStack(Material.POINTED_DRIPSTONE), book
+                }, explorerItems.heavyForgeItem);
+
+        // 7. Photosynthesis (Durability - Max 1)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.photosynthesis", "Photosynthesis", "photosynthesis", "DURABILITY", 1, 
+                "Slowly restores item durability while standing on dirt/grass under direct sunlight. No levels.", 
+                org.bukkit.Color.fromRGB(50, 205, 50), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, arcaneItems.sunsBrillianceItem, enchBook,
+                        null, arcaneItems.naturesEmbraceItem, null,
+                        enchBook, arcaneItems.sunsBrillianceItem, enchBook
+                }, arcaneItems.arcanaTableItem);
+
+        // 8. Zephyr (Bows/Crossbows - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.zephyr", "Zephyr", "zephyr", "WEAPON_BOW", 1, 
+                "Gravity has no effect on fired arrows. No levels.", 
+                org.bukkit.Color.fromRGB(224, 255, 255), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, new ItemStack(Material.PHANTOM_MEMBRANE), enchBook,
+                        null, new ItemStack(Material.FEATHER), null,
+                        enchBook, new ItemStack(Material.PHANTOM_MEMBRANE), enchBook
+                }, explorerItems.heavyForgeItem);
+
+        // 9. Artemis's Blessing (Bows - Max 1)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.artemis_blessing", "Artemis's Blessing", "artemis_blessing", "WEAPON_BOW_ONLY", 1, 
+                "Silences bow shots and adds +5 levels of Punch. No levels.", 
+                org.bukkit.Color.fromRGB(154, 205, 50), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, arcaneItems.naturesEmbraceItem, enchBook,
+                        null, new ItemStack(Material.BOW), null,
+                        enchBook, null, enchBook
+                }, arcaneItems.arcanaTableItem);
+
+        // 10. Static Charge (Chestplate - Max 7)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.static_charge", "Static Charge", "static_charge", "ARMOR_CHESTPLATE", 7, 
+                "Generates charge while moving. Fully charged adds spark and next hit deals +25% bonus damage.", 
+                org.bukkit.Color.fromRGB(255, 255, 0), org.bukkit.FireworkEffect.Type.BALL, 8,
+                new ItemStack[]{
+                        book, arcaneItems.lightningEssenceItem, book,
+                        null, new ItemStack(Material.DIAMOND_CHESTPLATE), null,
+                        book, arcaneItems.lightningEssenceItem, book
+                }, arcaneItems.arcanaTableItem);
+
+        // 11. Phantom Backstab (Swords - Max 4 - Blood Altar)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.phantom_backstab", "Phantom Backstab", "phantom_backstab", "WEAPON_SWORD", 4, 
+                "Melee hits have 50% chance to strike target with spectral sword behind them after 1s.", 
+                org.bukkit.Color.fromRGB(75, 0, 130), org.bukkit.FireworkEffect.Type.BALL, 15,
+                new ItemStack[]{
+                        enchBook, arcaneItems.createCustomRune("arcane.runes.bleed", "Bleed", "bleed", "WEAPON_SWORD_AXE", 1, "Applies ticking bleed stacks.", org.bukkit.Color.fromRGB(150, 0, 0), org.bukkit.FireworkEffect.Type.BALL, false, false), enchBook,
+                        arcaneItems.enderEssence, arcaneItems.echoingCore, arcaneItems.createTotemOfFallacy(),
+                        enchBook, arcaneItems.createLifestealRuneOfLevel(3), enchBook
+                }, arcaneItems.bloodAltarItem);
+
+        // 12. Telekinesis (Tools - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.telekinesis", "Telekinesis", "telekinesis", "TOOLS_HOE", 1, 
+                "Teleports mined blocks and experience orbs directly to inventory. No levels.", 
+                org.bukkit.Color.fromRGB(238, 130, 238), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, null, enchBook,
+                        null, explorerItems.magneticRingItem, null,
+                        enchBook, null, enchBook
+                }, explorerItems.heavyForgeItem);
+
+        // 13. Kinetic Rebound (Shields - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.kinetic_rebound", "Kinetic Rebound", "kinetic_rebound", "SHIELD", 1, 
+                "Blocking projectiles has a high chance to reflect them back to source. No levels.", 
+                org.bukkit.Color.fromRGB(211, 211, 211), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, arcaneItems.resonantPlateItem, enchBook,
+                        null, new ItemStack(Material.SHIELD), null,
+                        enchBook, arcaneItems.resonantPlateItem, enchBook
+                }, explorerItems.heavyForgeItem);
+
+        // 14. Redirection (Armor - Max 6)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.redirection", "Redirection", "redirection", "ARMOR", 6, 
+                "Redirects a percentage of incoming damage (up to 40% at level 6) to nearby pets.", 
+                org.bukkit.Color.fromRGB(244, 164, 96), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, arcaneItems.linkStoneItem, book,
+                        null, new ItemStack(Material.LEAD), null,
+                        book, arcaneItems.linkStoneItem, book
+                }, arcaneItems.arcanaTableItem);
+
+        // 15. Bleed (Swords/Axes - Max 8 - Blood Altar)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.bleed", "Bleed", "bleed", "WEAPON_SWORD_AXE", 8, 
+                "Applies ticking bleeding stacks on melee hit that continuously drain target health.", 
+                org.bukkit.Color.fromRGB(150, 0, 0), org.bukkit.FireworkEffect.Type.BALL, 12,
+                new ItemStack[]{
+                        arcaneItems.bloodItem, arcaneItems.bloodItem, arcaneItems.bloodItem,
+                        book, new ItemStack(Material.WITHER_SKELETON_SKULL), book,
+                        arcaneItems.bloodItem, arcaneItems.bloodItem, arcaneItems.bloodItem
+                }, arcaneItems.bloodAltarItem);
+
+        // 16. Poison Spores (Swords/Axes - Max 5)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.poison_spores", "Poison Spores", "poison_spores", "WEAPON_SWORD_AXE", 5, 
+                "Applies standard Poison effect on hit. Scales duration and proc chance.", 
+                org.bukkit.Color.fromRGB(0, 255, 127), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, arcaneItems.poisonVialItem, book,
+                        new ItemStack(Material.FERMENTED_SPIDER_EYE), new ItemStack(Material.PUFFERFISH), new ItemStack(Material.FERMENTED_SPIDER_EYE),
+                        book, arcaneItems.poisonVialItem, book
+                }, arcaneItems.arcanaTableItem);
+
+        // 17. Gas Cloud (Armor - Max 4)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.gas_cloud", "Gas Cloud", "gas_cloud", "ARMOR", 4, 
+                "Dealing/taking damage has a chance to release decay toxic gas cloud on block.", 
+                org.bukkit.Color.fromRGB(128, 128, 0), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, new ItemStack(Material.GUNPOWDER), book,
+                        arcaneItems.poisonVialItem, new ItemStack(Material.GUNPOWDER), arcaneItems.poisonVialItem,
+                        book, new ItemStack(Material.GUNPOWDER), book
+                }, arcaneItems.arcanaTableItem);
+
+        // 18. Heavy Draw (Bows - Max 5)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.heavy_draw", "Heavy Draw", "heavy_draw", "WEAPON_BOW_ONLY", 5, 
+                "Increases arrow draw time by 50% but raises arrow damage by up to +50%.", 
+                org.bukkit.Color.fromRGB(105, 105, 105), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        book, new ItemStack(Material.ANVIL), book,
+                        new ItemStack(Material.CHIPPED_ANVIL), new ItemStack(Material.BOW), new ItemStack(Material.CHIPPED_ANVIL),
+                        book, new ItemStack(Material.ANVIL), book
+                }, arcaneItems.arcanaTableItem);
+
+        // 19. Timber (Axes - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.timber", "Timber", "timber", "WEAPON_AXE", 1, 
+                "Instantly chops entire trees of connected logs on break. No levels.", 
+                org.bukkit.Color.fromRGB(205, 133, 63), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, new ItemStack(Material.OAK_LOG), enchBook,
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.OAK_LOG), new ItemStack(Material.IRON_INGOT),
+                        enchBook, new ItemStack(Material.IRON_INGOT), enchBook
+                }, explorerItems.heavyForgeItem);
+
+        // 20. Soul Harvester (Hoes - Max 1)
+        registerMultiLevelRune(arcaneRunes, "arcane.runes.soul_harvester", "Soul Harvester", "soul_harvester", "TOOL_HOE", 1, 
+                "Hoe kills have small chance to drop Soul Orbs which give massive XP. No levels.", 
+                org.bukkit.Color.fromRGB(72, 61, 139), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, arcaneItems.soulOrbItem, enchBook,
+                        null, new ItemStack(Material.NETHER_STAR), null,
+                        enchBook, arcaneItems.soulOrbItem, enchBook
+                }, arcaneItems.arcanaTableItem);
+
+        // 21. Crude Sharpness (Tools/Sticks - Max 7)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.crude_sharpness", "Crude Sharpness", "crude_sharpness", "MELEE_OR_STICK", 7, 
+                "Adds flat melee damage boost. Applies to pickaxes, shovels, axes, hoes, and sticks.", 
+                org.bukkit.Color.fromRGB(192, 192, 192), org.bukkit.FireworkEffect.Type.BALL, 8,
+                new ItemStack[]{
+                        book, new ItemStack(Material.IRON_INGOT), book,
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.STICK), new ItemStack(Material.IRON_INGOT),
+                        book, new ItemStack(Material.IRON_INGOT), book
+                }, explorerItems.heavyForgeItem);
+
+        // 22. Basalt Trail (Boots - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.basalt_trail", "Basalt Trail", "basalt_trail", "ARMOR_BOOTS", 1, 
+                "Cools lava blocks directly beneath your feet into temporary Basalt blocks. No levels.", 
+                org.bukkit.Color.fromRGB(255, 127, 80), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, arcaneItems.coreOfHeat, enchBook,
+                        null, new ItemStack(Material.NETHERITE_BOOTS), null,
+                        enchBook, arcaneItems.coreOfHeat, enchBook
+                }, explorerItems.heavyForgeItem);
+
+        // 23. Void Walker (Boots - Max 1)
+        registerMultiLevelRune(explorerRunes, "explorer.runes.void_walker", "Void Walker", "void_walker", "ARMOR_BOOTS", 1, 
+                "Freefalling 20 blocks in the void teleports you safely back to ground. No levels.", 
+                org.bukkit.Color.fromRGB(186, 85, 211), org.bukkit.FireworkEffect.Type.BALL, 10,
+                new ItemStack[]{
+                        enchBook, arcaneItems.blessingOfTheVoidItem, enchBook,
+                        null, new ItemStack(Material.NETHERITE_BOOTS), null,
+                        enchBook, arcaneItems.blessingOfTheVoidItem, enchBook
+                }, explorerItems.heavyForgeItem);
+    }
+
+    private void registerMultiLevelRune(
+            CodexCategory category,
+            String baseId,
+            String displayName,
+            String effect,
+            String type,
+            int maxLevel,
+            String desc,
+            org.bukkit.Color color,
+            org.bukkit.FireworkEffect.Type starType,
+            int xpBase,
+            ItemStack[] lvl1Recipe,
+            ItemStack recipeStation
+    ) {
+        // Register Level 1
+        String l1Name = maxLevel == 1 ? displayName : displayName + " I";
+        ItemStack lvl1Rune = arcaneItems.createCustomRune(baseId, displayName, effect, type, 1, desc, color, starType, false, false);
+        CodexItem lvl1Codex = new CodexItem.Builder(baseId)
+                .displayName(l1Name)
+                .displayItem(lvl1Rune)
+                .xpCost(xpBase)
+                .requires(lvl1Rune)
+                .description(desc)
+                .craftingStation(recipeStation)
+                .recipe(lvl1Recipe)
+                .build();
+        category.addItem(lvl1Codex);
+
+        // Register Levels 2 to maxLevel
+        for (int lvl = 2; lvl <= maxLevel; lvl++) {
+            String id = baseId + "_" + lvl;
+            String roman = getRomanNum(lvl);
+            ItemStack prevRune = arcaneItems.createCustomRune(baseId, displayName, effect, type, lvl - 1, desc, color, getStarTypeForLevel(lvl - 1, starType), hasTrail(lvl - 1), hasFlicker(lvl - 1));
+            ItemStack currentRune = arcaneItems.createCustomRune(baseId, displayName, effect, type, lvl, desc, color, getStarTypeForLevel(lvl, starType), hasTrail(lvl), hasFlicker(lvl));
+
+            CodexItem lvlCodex = new CodexItem.Builder(id)
+                    .displayName(displayName + " " + roman)
+                    .displayItem(currentRune)
+                    .xpCost(xpBase + (lvl - 1) * 4)
+                    .requires(currentRune)
+                    .description("Upgraded " + displayName + " Rune.")
+                    .craftingStation(arcaneItems.upgradeTableItem)
+                    .recipe(
+                            null, prevRune.clone(), null,
+                            null, prevRune.clone(), null,
+                            null, null, null
+                    )
+                    .build();
+            category.addItem(lvlCodex);
+        }
+    }
+
+    private String getRomanNum(int level) {
+        switch (level) {
+            case 1: return "I";
+            case 2: return "II";
+            case 3: return "III";
+            case 4: return "IV";
+            case 5: return "V";
+            case 6: return "VI";
+            case 7: return "VII";
+            case 8: return "VIII";
+            default: return String.valueOf(level);
+        }
+    }
+
+    private org.bukkit.FireworkEffect.Type getStarTypeForLevel(int level, org.bukkit.FireworkEffect.Type baseType) {
+        if (level >= 4) return org.bukkit.FireworkEffect.Type.STAR;
+        if (level >= 2) return org.bukkit.FireworkEffect.Type.BALL_LARGE;
+        return baseType;
+    }
+
+    private boolean hasTrail(int level) {
+        return level >= 2;
+    }
+
+    private boolean hasFlicker(int level) {
+        return level >= 3;
     }
 
     public void registerCommands(Commands commands) {

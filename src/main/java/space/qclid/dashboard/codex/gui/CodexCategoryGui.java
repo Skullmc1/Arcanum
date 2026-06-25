@@ -44,7 +44,7 @@ public class CodexCategoryGui {
             int itemIndex = startIndex + i;
             if (itemIndex < endIndex) {
                 CodexItem item = allItems.get(itemIndex);
-                boolean unlocked = manager.isUnlocked(player.getUniqueId(), item.getId());
+                boolean unlocked = item.isDefaultUnlocked() || manager.isUnlocked(player.getUniqueId(), item.getId());
 
                 ItemStack guiItem;
                 if (unlocked) {

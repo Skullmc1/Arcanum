@@ -17,6 +17,7 @@ public class CodexItem {
     private final String description;
     private final ItemStack craftingStation;
     private final ItemStack[] recipe; // 9-slot array matching a 3×3 grid; null = empty slot
+    private final boolean defaultUnlocked;
 
     private CodexItem(Builder b) {
         this.id               = b.id;
@@ -27,6 +28,7 @@ public class CodexItem {
         this.description      = b.description;
         this.craftingStation  = b.craftingStation;
         this.recipe           = b.recipe.clone();
+        this.defaultUnlocked  = b.defaultUnlocked;
     }
 
     public String          getId()               { return id; }
@@ -37,6 +39,7 @@ public class CodexItem {
     public String          getDescription()      { return description; }
     public ItemStack       getCraftingStation()  { return craftingStation != null ? craftingStation.clone() : null; }
     public ItemStack[]     getRecipe()           { return recipe.clone(); }
+    public boolean         isDefaultUnlocked()   { return defaultUnlocked; }
 
     // ── Builder ───────────────────────────────────────────────────────────────
 
@@ -49,6 +52,7 @@ public class CodexItem {
         private String description      = "";
         private ItemStack craftingStation;
         private ItemStack[] recipe      = new ItemStack[9];
+        private boolean defaultUnlocked = false;
 
         public Builder(String id)                          { this.id = id; }
         public Builder displayName(String name)            { this.displayName = name;        return this; }
@@ -57,6 +61,7 @@ public class CodexItem {
         public Builder requires(ItemStack item)            { itemRequirements.add(item);     return this; }
         public Builder description(String desc)            { this.description = desc;        return this; }
         public Builder craftingStation(ItemStack station)  { this.craftingStation = station; return this; }
+        public Builder defaultUnlocked(boolean val)        { this.defaultUnlocked = val;     return this; }
         public Builder recipe(ItemStack... items) {
             if (items.length != 9) throw new IllegalArgumentException("Recipe must have exactly 9 slots.");
             this.recipe = items;

@@ -18,14 +18,18 @@ This document lists all the custom items that have been fully created and regist
 - **Structure**: Anvil on top of a Dropper on top of a Bookshelf.
 - **Description**: Used to upgrade and combine items (such as runes) by placing ingredients in the Dropper and shift-right-clicking the Anvil.
 
+### 3a. Block Duplicator
+- **Structure**: Nether Brick Fence on top of a Dropper surrounded horizontally (North, South, East, West) by Furnaces and/or Blast Furnaces.
+- **Description**: Used to duplicate building blocks placed inside the Dropper by right-clicking the Nether Brick Fence. Requires Lava Buckets in the surrounding furnaces/blast furnaces as fuel (1 bucket per 2 stacks). Can process multiple slots simultaneously.
+
 ---
 
 ## 🔮 Arcane Category
 
-### 4. Lifesteal Rune I, II, III
+### 4. Vampiric Bleed Rune I, II, III
 - **Item IDs**: `arcane.lifesteal_rune`, `arcane.lifesteal_rune_2`, `arcane.lifesteal_rune_3`
 - **Material**: `FIREWORK_STAR`
-- **Description**: Applied to swords to heal on hit (heals 15%, 30%, 45% of damage respectively).
+- **Description**: Applied to swords to heal on hit (heals 15%, 30%, 45% of damage respectively). Requires Blood Vials to craft.
 
 ### 5. Speed Rune I, II, III
 - **Item IDs**: `arcane.speed_rune`, `arcane.speed_rune_2`, `arcane.speed_rune_3`
@@ -106,6 +110,21 @@ This document lists all the custom items that have been fully created and regist
 - **Item ID**: `arcane.trinkets.vitality_geode_3`
 - **Material**: `AMETHYST_CLUSTER` (bold)
 - **Description**: Increases max health by +20 (10 hearts).
+
+### 19a. Wand of Levitation
+- **Item ID**: `arcane.ranged.wand_of_levitation`
+- **Material**: `FEATHER`
+- **Description**: Shoots a levitation bolt that gives Levitation I for 5 seconds to targets. Cooldown: 15s.
+
+### 19b. Gale Chestplate
+- **Item ID**: `arcane.armor.gale_chestplate`
+- **Material**: `DIAMOND_CHESTPLATE`
+- **Description**: Grants permanent Slow Falling I and allows double jumping in mid-air. Cooldown: 10s.
+
+### 19c. Siphon Blade
+- **Item ID**: `arcane.melee.siphon_blade`
+- **Material**: `DIAMOND_SWORD`
+- **Description**: Restores 15% of your max health upon killing an enemy.
 
 ---
 
@@ -215,6 +234,26 @@ This document lists all the custom items that have been fully created and regist
 - **Item ID**: `explorer.tools.portable_stonecutter`
 - **Material**: `STONECUTTER`
 - **Description**: Open stonecutter anywhere.
+
+### 40a. Waypoint Teleport Plate
+- **Item ID**: `explorer.navigation.teleportation_plate`
+- **Material**: `HEAVY_WEIGHTED_PRESSURE_PLATE`
+- **Description**: Link with a Waypoint Compass to instantly teleport players stepping on it to the waypoint.
+
+### 40b. Slime Boots
+- **Item ID**: `explorer.gadgets.slime_boots`
+- **Material**: `SLIME_BLOCK`
+- **Description**: Negates all fall damage and bounces the wearer upward based on fall speed.
+
+### 40c. Ore Scanner
+- **Item ID**: `explorer.exploration.ore_scanner`
+- **Material**: `SPYGLASS`
+- **Description**: Right-click to highlight nearby valuable ores (Diamonds, Gold, Iron) in a 10-block radius with green particles for 5 seconds. Cooldown: 30s.
+
+### 40d. Magnetic Ring
+- **Item ID**: `explorer.gadgets.magnetic_ring`
+- **Material**: `GOLD_NUGGET`
+- **Description**: While held in inventory, pulls dropped items within a 5-block radius towards the player.
 
 ---
 

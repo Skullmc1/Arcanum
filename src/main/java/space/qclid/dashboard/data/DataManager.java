@@ -20,6 +20,7 @@ public class DataManager {
 
     private final JavaPlugin plugin;
     private final Map<UUID, PlayerSettings> playerSettings = new HashMap<>();
+    public final Map<String, org.bukkit.Location> teleportPlates = new HashMap<>();
 
     public DataManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -68,6 +69,12 @@ public class DataManager {
             }
         }
 
+        if (!teleportPlates.isEmpty()) {
+            for (Map.Entry<String, org.bukkit.Location> entry : teleportPlates.entrySet()) {
+                config.set("teleportPlates." + entry.getKey().replace(".", "[dot]"), entry.getValue());
+            }
+        }
+
         try {
             config.save(file);
         } catch (Exception e) {
@@ -80,7 +87,17 @@ public class DataManager {
         if (!file.exists()) return;
 
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+
+        ConfigurationSection platesSection = config.getConfigurationSection("teleportPlates");
+        if (platesSection != null) {
+            for (String key : platesSection.getKeys(false)) {
+                String originalKey = key.replace("[dot]", ".");
+                teleportPlates.put(originalKey, platesSection.getLocation(key));
+            }
+        }
+
         for (String uuidStr : config.getKeys(false)) {
+            if (uuidStr.equals("teleportPlates")) continue;
             try {
                 UUID uuid = UUID.fromString(uuidStr);
                 PlayerSettings s = new PlayerSettings();

@@ -1,6 +1,7 @@
 package space.qclid.dashboard.codex;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -18,6 +19,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.block.BlockFace;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,13 +30,18 @@ import static space.qclid.dashboard.util.TextUtil.*;
 public class CodexPassiveTask {
 
     private final JavaPlugin plugin;
+    private final ArcaneItems arcaneItems;
 
     // Track virtual furnaces and smelters for portable tools
     public final Map<UUID, Inventory> activeFurnaces = new HashMap<>();
     public final Map<UUID, Inventory> activeSmelters = new HashMap<>();
 
-    public CodexPassiveTask(JavaPlugin plugin) {
+    private final Map<UUID, Integer> jetpackFuelTicks = new HashMap<>();
+    private int scanCounter = 0;
+
+    public CodexPassiveTask(JavaPlugin plugin, ArcaneItems arcaneItems) {
         this.plugin = plugin;
+        this.arcaneItems = arcaneItems;
     }
 
     public void runTick() {
@@ -43,8 +50,21 @@ public class CodexPassiveTask {
             updateVitalityGeode(player);
             updateShadowCloaks(player);
             updateFlippersAndHelmet(player);
+            updateGaleChestplate(player);
+            updateMagneticRing(player);
+            updateJetpack(player);
+            updateDemoniumRunes(player);
+            updatePhotosynthesis(player);
+            updateVoidWalker(player);
         }
         tickCatchFlameSpread();
+        updateSunExposureItems();
+
+        scanCounter++;
+        if (scanCounter >= 10) { // every 100 ticks (5s)
+            scanCounter = 0;
+            runAutomations();
+        }
     }
 
     public void runVirtualFurnaceTick() {
@@ -280,5 +300,467 @@ public class CodexPassiveTask {
         NamespacedKey key = new NamespacedKey(plugin, "item_id");
         String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
         return expectedId.equals(id);
+    }
+
+    private void updateGaleChestplate(Player player) {
+        ItemStack chestplate = player.getInventory().getChestplate();
+        if (chestplate != null && isCustomItem(chestplate, "arcane.armor.gale_chestplate")) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 25, 0, true, false, true));
+            if (player.isOnGround()) {
+                if (player.getGameMode() != org.bukkit.GameMode.CREATIVE && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                    if (!player.hasCooldown(Material.DIAMOND_CHESTPLATE)) {
+                        player.setAllowFlight(true);
+                    } else {
+                        player.setAllowFlight(false);
+                    }
+                }
+            }
+        } else {
+            if (player.getGameMode() != org.bukkit.GameMode.CREATIVE && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                if (player.getAllowFlight()) {
+                    player.setAllowFlight(false);
+                    player.setFlying(false);
+                }
+            }
+        }
+    }
+
+    private void updateMagneticRing(Player player) {
+        boolean hasRing = false;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && isCustomItem(item, "explorer.gadgets.magnetic_ring")) {
+                hasRing = true;
+                break;
+            }
+        }
+        if (hasRing) {
+            double radius = 5.0;
+            for (Entity entity : player.getNearbyEntities(radius, radius, radius)) {
+                if (entity instanceof org.bukkit.entity.Item itemEntity) {
+                    if (itemEntity.getPickupDelay() <= 0) {
+                        org.bukkit.util.Vector target = player.getLocation().add(0, 0.5, 0).toVector();
+                        org.bukkit.util.Vector dir = target.subtract(itemEntity.getLocation().toVector());
+                        double distance = dir.length();
+                        if (distance > 0.2) {
+                            double speed = 0.35;
+                            org.bukkit.util.Vector vel = dir.normalize().multiply(speed);
+                            itemEntity.setVelocity(vel);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void updateJetpack(Player player) {
+        if (player.getGameMode() == org.bukkit.GameMode.CREATIVE || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+
+        ItemStack chest = player.getInventory().getChestplate();
+        if (chest != null && isCustomItem(chest, "explorer.armor.steam_jetpack")) {
+            if (player.isSneaking() && !player.isOnGround()) {
+                int ticks = jetpackFuelTicks.getOrDefault(player.getUniqueId(), 0) + 10;
+                if (ticks >= 20) {
+                    ticks = 0;
+                    if (!consumeJetpackFuel(player)) {
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 0.5f);
+                        player.sendActionBar(MM.deserialize(C_RED + toSmallCaps("Jetpack: Out of fuel!")));
+                        jetpackFuelTicks.put(player.getUniqueId(), 0);
+                        return;
+                    }
+                }
+                jetpackFuelTicks.put(player.getUniqueId(), ticks);
+
+                org.bukkit.util.Vector vel = player.getVelocity();
+                player.setVelocity(new org.bukkit.util.Vector(vel.getX(), 0.42, vel.getZ()));
+
+                player.getWorld().spawnParticle(org.bukkit.Particle.CAMPFIRE_COSY_SMOKE, player.getLocation(), 3, 0.1, 0.0, 0.1, 0.02);
+                player.getWorld().spawnParticle(org.bukkit.Particle.FLAME, player.getLocation(), 2, 0.05, 0.0, 0.05, 0.01);
+                player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_SHOOT, 0.15f, 0.8f);
+            } else {
+                jetpackFuelTicks.remove(player.getUniqueId());
+            }
+        }
+    }
+
+    private boolean consumeJetpackFuel(Player player) {
+        if (player.getGameMode() == org.bukkit.GameMode.CREATIVE) return true;
+
+        String[] fuels = {
+            "arcane.materials.hardened_coal_max",
+            "arcane.materials.hardened_coal_2",
+            "arcane.materials.hardened_coal_1"
+        };
+        for (String fuelId : fuels) {
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (item != null && isCustomItem(item, fuelId)) {
+                    item.setAmount(item.getAmount() - 1);
+                    return true;
+                }
+            }
+        }
+
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && (item.getType() == Material.COAL || item.getType() == Material.CHARCOAL)) {
+                ItemMeta meta = item.getItemMeta();
+                if (meta != null) {
+                    NamespacedKey key = new NamespacedKey(plugin, "item_id");
+                    if (meta.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
+                        continue;
+                    }
+                }
+                item.setAmount(item.getAmount() - 1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateDemoniumRunes(Player player) {
+        ItemStack helmet = player.getInventory().getHelmet();
+        if (helmet == null || helmet.getType() == Material.AIR) return;
+
+        ItemMeta meta = helmet.getItemMeta();
+        if (meta == null) return;
+
+        NamespacedKey applyKey = new NamespacedKey(plugin, "rune_demonium");
+        Integer lvl = meta.getPersistentDataContainer().get(applyKey, PersistentDataType.INTEGER);
+        if (lvl != null) {
+            double radius = 2.0;
+            int duration = lvl == 1 ? 40 : (lvl == 2 ? 100 : 200);
+            for (Entity entity : player.getNearbyEntities(radius, radius, radius)) {
+                if (entity instanceof LivingEntity target && !target.equals(player)) {
+                    if (target instanceof Player pTarget) {
+                        if (pTarget.getGameMode() == org.bukkit.GameMode.CREATIVE || pTarget.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+                            continue;
+                        }
+                    }
+                    target.setFireTicks(duration);
+                    target.getWorld().spawnParticle(org.bukkit.Particle.FLAME, target.getLocation().add(0, 0.5, 0), 2, 0.1, 0.2, 0.1, 0.01);
+                }
+            }
+        }
+    }
+
+    private void runAutomations() {
+        java.util.Set<org.bukkit.Location> processed = new java.util.HashSet<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            Location loc = player.getLocation();
+            World world = loc.getWorld();
+            int px = loc.getBlockX();
+            int py = loc.getBlockY();
+            int pz = loc.getBlockZ();
+
+            for (int x = px - 8; x <= px + 8; x++) {
+                for (int y = py - 4; y <= py + 4; y++) {
+                    for (int z = pz - 8; z <= pz + 8; z++) {
+                        org.bukkit.block.Block b = world.getBlockAt(x, y, z);
+                        if (b.getType() == Material.DROPPER) {
+                            org.bukkit.Location bLoc = b.getLocation();
+                            if (processed.contains(bLoc)) continue;
+                            processed.add(bLoc);
+
+                            if (b.getState() instanceof org.bukkit.block.Dropper dropper) {
+                                tickAutomationDropper(dropper);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void tickAutomationDropper(org.bukkit.block.Dropper dropper) {
+        org.bukkit.block.Block block = dropper.getBlock();
+
+        org.bukkit.block.Block top = block.getRelative(org.bukkit.block.BlockFace.UP);
+        if (top.getType() == Material.HOPPER) {
+            org.bukkit.block.BlockFace[] faces = {
+                org.bukkit.block.BlockFace.NORTH,
+                org.bukkit.block.BlockFace.SOUTH,
+                org.bukkit.block.BlockFace.EAST,
+                org.bukkit.block.BlockFace.WEST
+            };
+            boolean hasCauldron = false;
+            org.bukkit.block.Block cauldronBlock = null;
+            for (org.bukkit.block.BlockFace face : faces) {
+                org.bukkit.block.Block adj = block.getRelative(face);
+                if (adj.getType() == Material.CAULDRON) {
+                    hasCauldron = true;
+                    cauldronBlock = adj;
+                    break;
+                }
+            }
+            if (hasCauldron) {
+                runSifterTick(dropper, cauldronBlock);
+                return;
+            }
+
+            boolean hasFurnace = false;
+            for (org.bukkit.block.BlockFace face : faces) {
+                org.bukkit.block.Block adj = block.getRelative(face);
+                if (adj.getType() == Material.FURNACE || adj.getType() == Material.BLAST_FURNACE || adj.getType() == Material.SMOKER) {
+                    hasFurnace = true;
+                    break;
+                }
+            }
+            if (hasFurnace) {
+                runSmelterTick(dropper);
+            }
+        }
+    }
+
+    private void runSifterTick(org.bukkit.block.Dropper dropper, org.bukkit.block.Block cauldron) {
+        Inventory inv = dropper.getInventory();
+        ItemStack target = null;
+        int targetSlot = -1;
+        for (int i = 0; i < inv.getSize(); i++) {
+            ItemStack item = inv.getItem(i);
+            if (item != null && (item.getType() == Material.GRAVEL || item.getType() == Material.SAND)) {
+                target = item;
+                targetSlot = i;
+                break;
+            }
+        }
+        if (target == null) return;
+
+        Material siftType = target.getType();
+        target.setAmount(target.getAmount() - 1);
+        inv.setItem(targetSlot, target.getAmount() <= 0 ? null : target);
+
+        Material result = Material.AIR;
+        double rand = Math.random();
+        if (siftType == Material.GRAVEL) {
+            if (rand < 0.15) result = Material.RAW_IRON;
+            else if (rand < 0.20) result = Material.RAW_GOLD;
+            else if (rand < 0.30) result = Material.RAW_COPPER;
+            else if (rand < 0.50) result = Material.COAL;
+            else if (rand < 0.70) result = Material.CLAY_BALL;
+            else result = Material.FLINT;
+        } else {
+            if (rand < 0.25) result = Material.REDSTONE;
+            else if (rand < 0.40) result = Material.GLOWSTONE_DUST;
+            else if (rand < 0.55) result = Material.QUARTZ;
+            else if (rand < 0.80) result = Material.CLAY_BALL;
+        }
+
+        if (result != Material.AIR) {
+            ItemStack output = new ItemStack(result, 1);
+            java.util.HashMap<Integer, ItemStack> leftover = inv.addItem(output);
+            if (!leftover.isEmpty()) {
+                Location dropLoc = cauldron.getLocation().add(0.5, 1.1, 0.5);
+                dropLoc.getWorld().dropItemNaturally(dropLoc, leftover.get(0));
+            }
+        }
+
+        Location loc = dropper.getLocation().add(0.5, 0.5, 0.5);
+        loc.getWorld().playSound(loc, siftType == Material.GRAVEL ? Sound.BLOCK_GRAVEL_BREAK : Sound.BLOCK_SAND_BREAK, 0.5f, 0.8f);
+        loc.getWorld().spawnParticle(
+                org.bukkit.Particle.BLOCK,
+                loc,
+                10,
+                0.2, 0.2, 0.2,
+                siftType.createBlockData()
+        );
+    }
+
+    private void runSmelterTick(org.bukkit.block.Dropper dropper) {
+        Inventory inv = dropper.getInventory();
+        NamespacedKey burnKey = new NamespacedKey(plugin, "burn_ticks");
+        org.bukkit.persistence.PersistentDataContainer pdc = dropper.getPersistentDataContainer();
+        int burnTicks = pdc.getOrDefault(burnKey, PersistentDataType.INTEGER, 0);
+
+        if (burnTicks > 0) {
+            burnTicks = Math.max(0, burnTicks - 100);
+            pdc.set(burnKey, PersistentDataType.INTEGER, burnTicks);
+            dropper.update();
+
+            smeltOneItem(dropper);
+        } else {
+            ItemStack fuelStack = null;
+            int fuelSlot = -1;
+            ItemStack smeltStack = null;
+            int smeltSlot = -1;
+
+            for (int i = 0; i < inv.getSize(); i++) {
+                ItemStack item = inv.getItem(i);
+                if (item != null && item.getType() != Material.AIR) {
+                    if (fuelStack == null && isAutomationFuel(item)) {
+                        fuelStack = item;
+                        fuelSlot = i;
+                    } else if (smeltStack == null && getSmeltResult(item.getType()) != null) {
+                        smeltStack = item;
+                        smeltSlot = i;
+                    }
+                }
+            }
+
+            if (fuelStack != null && smeltStack != null) {
+                int fuelVal = getFuelBurnTime(fuelStack);
+                fuelStack.setAmount(fuelStack.getAmount() - 1);
+                inv.setItem(fuelSlot, fuelStack.getAmount() <= 0 ? null : fuelStack);
+
+                pdc.set(burnKey, PersistentDataType.INTEGER, fuelVal);
+                dropper.update();
+
+                smeltOneItem(dropper);
+
+                Location loc = dropper.getLocation().add(0.5, 0.5, 0.5);
+                loc.getWorld().playSound(loc, Sound.BLOCK_FURNACE_FIRE_CRACKLE, 0.8f, 1f);
+                loc.getWorld().spawnParticle(org.bukkit.Particle.FLAME, loc, 5, 0.1, 0.1, 0.1, 0.02);
+            }
+        }
+    }
+
+    private boolean isAutomationFuel(ItemStack item) {
+        if (item == null) return false;
+        Material m = item.getType();
+        if (isCustomItem(item, "arcane.materials.hardened_coal_1") ||
+            isCustomItem(item, "arcane.materials.hardened_coal_2") ||
+            isCustomItem(item, "arcane.materials.hardened_coal_max")) return true;
+        return m == Material.COAL || m == Material.CHARCOAL || m == Material.COAL_BLOCK ||
+               m == Material.LAVA_BUCKET || m == Material.BLAZE_ROD || m.name().contains("WOOD") ||
+               m.name().contains("LOG") || m.name().contains("PLANKS") || m == Material.STICK;
+    }
+
+    private int getFuelBurnTime(ItemStack item) {
+        if (isCustomItem(item, "arcane.materials.hardened_coal_1")) return 3200;
+        if (isCustomItem(item, "arcane.materials.hardened_coal_2")) return 6400;
+        if (isCustomItem(item, "arcane.materials.hardened_coal_max")) return 12800;
+
+        Material m = item.getType();
+        switch (m) {
+            case COAL_BLOCK: return 16000;
+            case LAVA_BUCKET: return 20000;
+            case BLAZE_ROD: return 2400;
+            case COAL: case CHARCOAL: return 1600;
+            case STICK: return 100;
+            default: return 300;
+        }
+    }
+
+    private void smeltOneItem(org.bukkit.block.Dropper dropper) {
+        Inventory inv = dropper.getInventory();
+        ItemStack smeltStack = null;
+        int smeltSlot = -1;
+
+        for (int i = 0; i < inv.getSize(); i++) {
+            ItemStack item = inv.getItem(i);
+            if (item != null && getSmeltResult(item.getType()) != null) {
+                smeltStack = item;
+                smeltSlot = i;
+                break;
+            }
+        }
+
+        if (smeltStack != null) {
+            Material resultMat = getSmeltResult(smeltStack.getType());
+            smeltStack.setAmount(smeltStack.getAmount() - 1);
+            inv.setItem(smeltSlot, smeltStack.getAmount() <= 0 ? null : smeltStack);
+
+            ItemStack output = new ItemStack(resultMat, 1);
+            java.util.HashMap<Integer, ItemStack> leftover = inv.addItem(output);
+            if (!leftover.isEmpty()) {
+                Location dropLoc = dropper.getLocation().add(0.5, 1.1, 0.5);
+                dropLoc.getWorld().dropItemNaturally(dropLoc, leftover.get(0));
+            }
+
+            Location loc = dropper.getLocation().add(0.5, 0.5, 0.5);
+            loc.getWorld().playSound(loc, Sound.BLOCK_FURNACE_FIRE_CRACKLE, 0.5f, 1f);
+            loc.getWorld().spawnParticle(org.bukkit.Particle.FLAME, loc, 3, 0.1, 0.1, 0.1, 0.02);
+        }
+    }
+
+    private void updateSunExposureItems() {
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntitiesByClass(org.bukkit.entity.Item.class)) {
+                org.bukkit.entity.Item itemEntity = (org.bukkit.entity.Item) entity;
+                ItemStack stack = itemEntity.getItemStack();
+                if (stack == null || stack.getType() == Material.AIR) continue;
+
+                if (isCustomItem(stack, "arcane.materials.immolation_totem")) {
+                    Location loc = itemEntity.getLocation();
+                    long time = world.getTime();
+                    boolean isDay = time < 13000;
+                    boolean isRaining = world.hasStorm();
+
+                    if (isDay && !isRaining && loc.getBlock().getLightFromSky() == 15) {
+                        int ticks = itemEntity.getMetadata("sun_exposure_ticks").isEmpty() ? 0 
+                                    : itemEntity.getMetadata("sun_exposure_ticks").get(0).asInt();
+                        ticks += 10;
+                        if (ticks >= 200) {
+                            int amount = stack.getAmount();
+                            ItemStack newStack = arcaneItems.sunsBrillianceItem.clone();
+                            newStack.setAmount(amount);
+                            itemEntity.setItemStack(newStack);
+                            itemEntity.removeMetadata("sun_exposure_ticks", plugin);
+
+                            loc.getWorld().playSound(loc, Sound.BLOCK_FIRE_AMBIENT, 1f, 1.2f);
+                            loc.getWorld().spawnParticle(org.bukkit.Particle.FLAME, loc, 20, 0.2, 0.2, 0.2, 0.05);
+                        } else {
+                            itemEntity.setMetadata("sun_exposure_ticks", new org.bukkit.metadata.FixedMetadataValue(plugin, ticks));
+                            loc.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, loc.add(0, 0.1, 0), 2, 0.1, 0.1, 0.1, 0.0);
+                        }
+                    } else {
+                        itemEntity.removeMetadata("sun_exposure_ticks", plugin);
+                    }
+                }
+            }
+        }
+    }
+
+    private void updatePhotosynthesis(Player player) {
+        Location loc = player.getLocation();
+        World world = loc.getWorld();
+        long time = world.getTime();
+        boolean isDay = time < 13000;
+        boolean isRaining = world.hasStorm();
+
+        if (isDay && !isRaining && loc.getBlock().getLightFromSky() == 15) {
+            Material typeBelow = loc.getBlock().getRelative(BlockFace.DOWN).getType();
+            if (typeBelow == Material.GRASS_BLOCK || typeBelow == Material.DIRT || typeBelow == Material.COARSE_DIRT || typeBelow == Material.ROOTED_DIRT || typeBelow == Material.MUD || typeBelow == Material.MUDDY_MANGROVE_ROOTS) {
+                boolean repairedAny = false;
+                for (ItemStack item : player.getInventory().getContents()) {
+                    if (item == null || item.getType() == Material.AIR) continue;
+                    ItemMeta meta = item.getItemMeta();
+                    if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
+                        NamespacedKey applyKey = new NamespacedKey(plugin, "rune_photosynthesis");
+                        if (meta.getPersistentDataContainer().has(applyKey, PersistentDataType.INTEGER)) {
+                            int dmg = damageable.getDamage();
+                            if (dmg > 0) {
+                                damageable.setDamage(dmg - 1);
+                                item.setItemMeta(meta);
+                                repairedAny = true;
+                            }
+                        }
+                    }
+                }
+                if (repairedAny) {
+                    player.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, player.getLocation().add(0, 1, 0), 3, 0.3, 0.5, 0.3, 0.0);
+                }
+            }
+        }
+    }
+
+    private void updateVoidWalker(Player player) {
+        ItemStack boots = player.getInventory().getBoots();
+        if (boots == null || boots.getType() == Material.AIR) return;
+        ItemMeta meta = boots.getItemMeta();
+        if (meta == null) return;
+        NamespacedKey applyKey = new NamespacedKey(plugin, "rune_void_walker");
+        if (meta.getPersistentDataContainer().has(applyKey, PersistentDataType.INTEGER)) {
+            int minHeight = player.getWorld().getMinHeight();
+            if (player.getLocation().getY() < minHeight - 5 && player.getFallDistance() >= 15) {
+                Location spawn = player.getRespawnLocation();
+                if (spawn == null) {
+                    spawn = player.getWorld().getSpawnLocation();
+                }
+
+                player.teleport(spawn);
+                player.setFallDistance(0);
+                player.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, player.getLocation(), 50, 0.5, 1, 0.5);
+                player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.0f);
+                player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Void Walker saved you from the void!")));
+            }
+        }
     }
 }

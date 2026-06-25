@@ -1,0 +1,286 @@
+package space.qclid.dashboard.codex;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Sound;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityResurrectEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.java.JavaPlugin;
+import space.qclid.dashboard.data.DataManager;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static space.qclid.dashboard.util.TextUtil.*;
+
+public class CodexPlayerListener implements Listener {
+
+    private final JavaPlugin plugin;
+    private final DataManager dataManager;
+    private final CodexManager manager;
+    private final CodexRegistry registry;
+    private final ArcaneItems arcaneItems;
+    private final ExplorerItems explorerItems;
+    private final CodexCrafting codexCrafting;
+    private final CodexPassiveTask codexPassiveTask;
+    private final Map<UUID, String> activeMachine;
+
+    public CodexPlayerListener(JavaPlugin plugin, DataManager dataManager, CodexManager manager, CodexRegistry registry,
+                               ArcaneItems arcaneItems, ExplorerItems explorerItems, CodexCrafting codexCrafting,
+                               CodexPassiveTask codexPassiveTask, Map<UUID, String> activeMachine) {
+        this.plugin = plugin;
+        this.dataManager = dataManager;
+        this.manager = manager;
+        this.registry = registry;
+        this.arcaneItems = arcaneItems;
+        this.explorerItems = explorerItems;
+        this.codexCrafting = codexCrafting;
+        this.codexPassiveTask = codexPassiveTask;
+        this.activeMachine = activeMachine;
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        org.bukkit.event.inventory.InventoryType type = event.getInventory().getType();
+        if (type == org.bukkit.event.inventory.InventoryType.WORKBENCH
+                || type == org.bukkit.event.inventory.InventoryType.CRAFTING) {
+            activeMachine.remove(player.getUniqueId());
+        }
+
+        if (event.getInventory().getHolder() instanceof VoidBagInventoryHolder) {
+            event.getInventory().clear();
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.5f, 0.5f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Void Bag items have been deleted!")));
+        }
+
+        // Return portable furnace/smelter items on close
+        if (codexPassiveTask.activeFurnaces.containsKey(player.getUniqueId()) && event.getInventory().equals(codexPassiveTask.activeFurnaces.get(player.getUniqueId()))) {
+            returnFurnaceItems(player, codexPassiveTask.activeFurnaces.remove(player.getUniqueId()));
+        }
+        if (codexPassiveTask.activeSmelters.containsKey(player.getUniqueId()) && event.getInventory().equals(codexPassiveTask.activeSmelters.get(player.getUniqueId()))) {
+            returnFurnaceItems(player, codexPassiveTask.activeSmelters.remove(player.getUniqueId()));
+        }
+    }
+
+    private void returnFurnaceItems(Player player, Inventory inv) {
+        for (int i = 0; i < 3; i++) {
+            ItemStack item = inv.getItem(i);
+            if (item != null && item.getType() != Material.AIR) {
+                if (player.getInventory().firstEmpty() == -1) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), item);
+                } else {
+                    player.getInventory().addItem(item);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        ItemStack main = player.getInventory().getItemInMainHand();
+        ItemStack off = player.getInventory().getItemInOffHand();
+
+        // Frostbite Ring
+        boolean hasRing = arcaneItems.isCustomItem(main, "arcane.trinkets.frostbite_ring") ||
+                          arcaneItems.isCustomItem(off, "arcane.trinkets.frostbite_ring");
+        if (hasRing) {
+            Block block = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+            if (block.getType() == Material.WATER) {
+                block.setType(Material.FROSTED_ICE);
+            }
+        }
+
+        // Basalt Trail
+        ItemStack boots = player.getInventory().getBoots();
+        if (boots != null && boots.getType() != Material.AIR) {
+            ItemMeta bMeta = boots.getItemMeta();
+            if (bMeta != null) {
+                NamespacedKey btKey = new NamespacedKey(plugin, "rune_basalt_trail");
+                if (bMeta.getPersistentDataContainer().has(btKey, PersistentDataType.INTEGER)) {
+                    Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+                    if (below.getType() == Material.LAVA) {
+                        below.setType(Material.BASALT);
+                        below.setMetadata("temp_basalt", new FixedMetadataValue(plugin, true));
+
+                        plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
+                            if (below.getType() == Material.BASALT && below.hasMetadata("temp_basalt")) {
+                                below.setType(Material.LAVA);
+                                below.removeMetadata("temp_basalt", plugin);
+                            }
+                        }, 200L);
+                    }
+                }
+            }
+        }
+
+        // Static Charge
+        ItemStack chest = player.getInventory().getChestplate();
+        if (chest != null && chest.getType() != Material.AIR) {
+            ItemMeta cMeta = chest.getItemMeta();
+            if (cMeta != null) {
+                NamespacedKey scKey = new NamespacedKey(plugin, "rune_static_charge");
+                Integer scLvl = cMeta.getPersistentDataContainer().get(scKey, PersistentDataType.INTEGER);
+                if (scLvl != null) {
+                    double dist = event.getFrom().distance(event.getTo());
+                    if (dist > 0.02) {
+                        double charge = player.hasMetadata("static_charge_amount") 
+                                         ? player.getMetadata("static_charge_amount").get(0).asDouble() : 0.0;
+                        if (charge < 100.0) {
+                            charge = Math.min(100.0, charge + dist * (1.5 + scLvl * 0.5));
+                            player.setMetadata("static_charge_amount", new FixedMetadataValue(plugin, charge));
+
+                            if (charge >= 100.0) {
+                                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.5f, 2f);
+                                player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Static Charge fully loaded!")));
+                            }
+
+                            if (charge > 50.0 && Math.random() < 0.1) {
+                                player.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, player.getLocation().add(0, 1, 0), 2, 0.2, 0.4, 0.2, 0.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onEntityResurrect(EntityResurrectEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        ItemStack main = player.getInventory().getItemInMainHand();
+        ItemStack off = player.getInventory().getItemInOffHand();
+        ItemStack amulet = null;
+        boolean inMain = false;
+
+        if (arcaneItems.isCustomItem(main, "arcane.trinkets.amulet_of_the_phoenix")) {
+            amulet = main;
+            inMain = true;
+        } else if (arcaneItems.isCustomItem(off, "arcane.trinkets.amulet_of_the_phoenix")) {
+            amulet = off;
+        }
+
+        if (amulet != null) {
+            event.setCancelled(false); // Force resurrect
+            ItemMeta meta = amulet.getItemMeta();
+            if (meta != null) {
+                NamespacedKey key = new NamespacedKey(plugin, "uses");
+                int uses = meta.getPersistentDataContainer().getOrDefault(key, PersistentDataType.INTEGER, 3);
+                uses--;
+                if (uses <= 0) {
+                    if (inMain) player.getInventory().setItemInMainHand(null);
+                    else player.getInventory().setItemInOffHand(null);
+                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1f);
+                } else {
+                    meta.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, uses);
+                    meta.lore(List.of(
+                            MM.deserialize(C_GRAY + toSmallCaps("Grants totem recovery and fiery explosion knockback.")),
+                            MM.deserialize(""),
+                            MM.deserialize(C_YELLOW + toSmallCaps("Uses remaining") + ": " + C_ORANGE + uses)
+                    ));
+                    amulet.setItemMeta(meta);
+                }
+            }
+
+            Location loc = player.getLocation();
+            player.getWorld().createExplosion(loc, 3.0f, false, false);
+            for (org.bukkit.entity.Entity entity : player.getNearbyEntities(4.0, 4.0, 4.0)) {
+                if (entity instanceof LivingEntity le && !le.equals(player)) {
+                    le.setFireTicks(100);
+                    org.bukkit.util.Vector vec = le.getLocation().toVector().subtract(loc.toVector()).normalize().multiply(1.5).setY(0.5);
+                    le.setVelocity(vec);
+                }
+            }
+            player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("The Amulet of the Phoenix saved your life!")));
+        }
+    }
+
+    @EventHandler
+    public void onPlayerToggleFlight(PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == org.bukkit.GameMode.CREATIVE || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+
+        ItemStack chestplate = player.getInventory().getChestplate();
+        if (arcaneItems.isCustomItem(chestplate, "arcane.armor.gale_chestplate")) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
+
+            if (player.hasCooldown(Material.DIAMOND_CHESTPLATE)) return;
+
+            org.bukkit.util.Vector velocity = player.getLocation().getDirection().multiply(1.2).setY(0.8);
+            player.setVelocity(velocity);
+
+            player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, player.getLocation(), 15, 0.3, 0.1, 0.3, 0.05);
+            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_WIND_CHARGE_THROW, 1f, 1.2f);
+
+            player.setCooldown(Material.DIAMOND_CHESTPLATE, 200); // 10s cooldown
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL) {
+            ItemStack boots = player.getInventory().getBoots();
+            if (arcaneItems.isCustomItem(boots, "explorer.gadgets.slime_boots")) {
+                event.setCancelled(true);
+                double fallDist = player.getFallDistance();
+                if (fallDist > 0.0) {
+                    double bounceVelocity = Math.min(2.5, Math.max(0.4, fallDist * 0.12));
+                    org.bukkit.util.Vector currentVel = player.getVelocity();
+                    player.setVelocity(new org.bukkit.util.Vector(currentVel.getX(), bounceVelocity, currentVel.getZ()));
+                    player.getWorld().spawnParticle(org.bukkit.Particle.ITEM_SLIME, player.getLocation(), 15, 0.4, 0.1, 0.4, 0.05);
+                    player.getWorld().playSound(player.getLocation(), Sound.BLOCK_SLIME_BLOCK_FALL, 1f, 1f);
+                }
+            } else if (boots != null && boots.getType() != Material.AIR) {
+                ItemMeta bMeta = boots.getItemMeta();
+                if (bMeta != null) {
+                    NamespacedKey slKey = new NamespacedKey(plugin, "rune_seismic_landing");
+                    Integer slLvl = bMeta.getPersistentDataContainer().get(slKey, PersistentDataType.INTEGER);
+                    if (slLvl != null) {
+                        double fallDist = player.getFallDistance();
+                        if (fallDist > 3.0) {
+                            double currentDamage = event.getDamage();
+                            double negated = Math.min(10.0, currentDamage);
+                            event.setDamage(currentDamage - negated);
+
+                            double radius = 3.0 + slLvl * 1.0;
+                            double damage = 4.0 + slLvl * 2.0;
+                            Location landLoc = player.getLocation();
+                            for (org.bukkit.entity.Entity entity : player.getNearbyEntities(radius, 2.0, radius)) {
+                                if (entity instanceof LivingEntity le && !le.equals(player)) {
+                                    le.damage(damage, player);
+                                    org.bukkit.util.Vector push = le.getLocation().subtract(landLoc).toVector().normalize().multiply(0.8).setY(0.4 + slLvl * 0.1);
+                                    le.setVelocity(push);
+                                }
+                            }
+
+                            landLoc.getWorld().playSound(landLoc, Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR, 1.2f, 0.5f);
+                            landLoc.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, landLoc, 20, radius / 2.0, 0.2, radius / 2.0, 0.1);
+                            landLoc.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, landLoc, 40, radius / 2.0, 0.2, radius / 2.0, 0.05, landLoc.getBlock().getRelative(BlockFace.DOWN).getBlockData());
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
