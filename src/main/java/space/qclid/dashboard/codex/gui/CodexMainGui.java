@@ -23,14 +23,14 @@ public class CodexMainGui {
                 0
         );
 
-        Inventory inv = Bukkit.createInventory(holder, 27, MM.deserialize("<dark_gray>» " + G_GOLD + toSmallCaps("The Codex")));
+        Inventory inv = Bukkit.createInventory(holder, 27, parse("<dark_gray>» " + G_GOLD + toSmallCaps("The Codex")));
         holder.setInventory(inv);
 
         // Fill background with gray glass
         ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta glassMeta = glass.getItemMeta();
         if (glassMeta != null) {
-            glassMeta.displayName(MM.deserialize(" "));
+            glassMeta.displayName(parse(" "));
             glass.setItemMeta(glassMeta);
         }
         for (int i = 0; i < 27; i++) {
@@ -43,7 +43,7 @@ public class CodexMainGui {
         ItemStack machineryIcon = new ItemStack(Material.CRAFTING_TABLE);
         ItemMeta machineryMeta = machineryIcon.getItemMeta();
         if (machineryMeta != null) {
-            machineryMeta.displayName(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps("General Machinery")));
+            machineryMeta.displayName(parse(C_GOLD + "<bold>" + toSmallCaps("General Machinery")));
             machineryMeta.lore(List.of(
                     MM.deserialize(""),
                     MM.deserialize(C_GRAY + toSmallCaps("Unlock placed machines and tools")),
@@ -60,7 +60,7 @@ public class CodexMainGui {
         ItemStack arcaneIcon = new ItemStack(Material.ENCHANTED_BOOK);
         ItemMeta arcaneMeta = arcaneIcon.getItemMeta();
         if (arcaneMeta != null) {
-            arcaneMeta.displayName(MM.deserialize(C_PURPLE + "<bold>" + toSmallCaps("Arcane Codex")));
+            arcaneMeta.displayName(parse(C_PURPLE + "<bold>" + toSmallCaps("Arcane Codex")));
             arcaneMeta.lore(List.of(
                     MM.deserialize(""),
                     MM.deserialize(C_GRAY + toSmallCaps("Unlock mystical runes, wands,")),
@@ -77,7 +77,7 @@ public class CodexMainGui {
         ItemStack explorerIcon = new ItemStack(Material.COMPASS);
         ItemMeta explorerMeta = explorerIcon.getItemMeta();
         if (explorerMeta != null) {
-            explorerMeta.displayName(MM.deserialize(C_GREEN + "<bold>" + toSmallCaps("Explorer Codex")));
+            explorerMeta.displayName(parse(C_GREEN + "<bold>" + toSmallCaps("Explorer Codex")));
             explorerMeta.lore(List.of(
                     MM.deserialize(""),
                     MM.deserialize(C_GRAY + toSmallCaps("Unlock traversal gadgets,")),

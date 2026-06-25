@@ -1,26 +1,10 @@
-# 📖 Proposed Codex Items & Design Templates
+# 📖 Proposed Codex Items (To Be Added)
 
-This document details new proposed items for the **Codex System** under the **Arcane** and **Explorer** categories. Each item listing includes its Material, Unlock requirements (XP and item), Crafting Station, and 3x3 recipe grid.
+This document details custom items planned for future implementation in the **Codex System** under the **Arcane** and **Explorer** categories.
 
 ---
 
 ## 🔮 Arcane Category
-
-### 1. Flame Rune I
-*Custom Enchantment Rune used to apply fire-based enchantments.*
-- **Item ID**: `arcane.runes.flame_rune`
-- **Sub-category**: `arcane.runes`
-- **Material**: `FIREWORK_STAR` (red color, custom display tags)
-- **Unlock XP Cost**: 8 levels
-- **Unlock Requirement**: `FLINT_AND_STEEL` (1) in inventory
-- **Description**: Target: `WEAPON_BOW` or `WEAPON_SWORD`. Applies Flame I / Fire Aspect I equivalent (ignites targets on hit) when swapped.
-- **Crafting Station**: Arcana Table (`machinery.arcana_table`)
-- **Crafting Recipe**:
-  | Column 1 | Column 2 | Column 3 |
-  | :--- | :--- | :--- |
-  | `REDSTONE` | `MAGMA_CREAM` | `REDSTONE` |
-  | `FIREWORK_STAR` | `FLINT_AND_STEEL` | `FIREWORK_STAR` |
-  | `REDSTONE` | `NETHER_WART` | `REDSTONE` |
 
 ### 2. Wand of Levitation
 *A magical wand that shoots a projectile rendering targets weightless.*
@@ -137,27 +121,3 @@ This document details new proposed items for the **Codex System** under the **Ar
   | `GOLD_NUGGET` | `IRON_INGOT` | `GOLD_NUGGET` |
   | `IRON_INGOT` | `REDSTONE` | `IRON_INGOT` |
   | `GOLD_NUGGET` | `IRON_INGOT` | `GOLD_NUGGET` |
-
----
-
-## 📝 Add Your Own Item Template
-
-Copy and paste the template below to define your own items!
-
-```markdown
-### [Item Name]
-- **Item ID**: `[category].[subcategory].[item_name]`
-- **Sub-category**: `[e.g., explorer.gadgets, arcane.runes, etc.]`
-- **Material**: `[Minecraft Material, e.g., SLIME_BALL, FIREWORK_STAR]`
-- **Unlock XP Cost**: `[Amount of XP levels required, e.g., 10]`
-- **Unlock Requirement**: `[Specific item needed in inventory to unlock, e.g., SLIME_BALL]`
-- **Description**: `[What the item does and how it behaves]`
-- **Crafting Station**: `[Arcana Table / Heavy Forge / Crafting Table]`
-- **Crafting Recipe**:
-  | Column 1 | Column 2 | Column 3 |
-  | :--- | :--- | :--- |
-  | `[Material]` | `[Material]` | `[Material]` |
-  | `[Material]` | `[Material]` | `[Material]` |
-  | `[Material]` | `[Material]` | `[Material]` |
-  *(Note: Use `AIR` or `null` for empty recipe slots)*
-```

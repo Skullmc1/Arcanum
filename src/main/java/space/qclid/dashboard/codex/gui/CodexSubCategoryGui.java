@@ -32,14 +32,14 @@ public class CodexSubCategoryGui {
         };
 
         String titleStr = "<dark_gray>» " + G_GOLD + toSmallCaps(categoryTitleName);
-        Inventory inv = Bukkit.createInventory(holder, 27, MM.deserialize(titleStr));
+        Inventory inv = Bukkit.createInventory(holder, 27, parse(titleStr));
         holder.setInventory(inv);
 
         // Fill background with gray glass
         ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta glassMeta = glass.getItemMeta();
         if (glassMeta != null) {
-            glassMeta.displayName(MM.deserialize(" "));
+            glassMeta.displayName(parse(" "));
             glass.setItemMeta(glassMeta);
         }
         for (int i = 0; i < 27; i++) {
@@ -61,7 +61,7 @@ public class CodexSubCategoryGui {
             ItemStack icon = category.getIcon();
             ItemMeta meta = icon.getItemMeta();
             if (meta != null) {
-                meta.displayName(MM.deserialize(G_GOLD + "<bold>" + toSmallCaps(category.getDisplayName())));
+                meta.displayName(parse(G_GOLD + "<bold>" + toSmallCaps(category.getDisplayName())));
                 meta.lore(List.of(
                         MM.deserialize(""),
                         MM.deserialize(C_GRAY + toSmallCaps("Click to view recipes in")),
@@ -79,7 +79,7 @@ public class CodexSubCategoryGui {
         ItemStack back = new ItemStack(Material.ARROW);
         ItemMeta backMeta = back.getItemMeta();
         if (backMeta != null) {
-            backMeta.displayName(MM.deserialize(C_RED + toSmallCaps("Back to Main Menu")));
+            backMeta.displayName(parse(C_RED + toSmallCaps("Back to Main Menu")));
             back.setItemMeta(backMeta);
         }
         inv.setItem(22, back);

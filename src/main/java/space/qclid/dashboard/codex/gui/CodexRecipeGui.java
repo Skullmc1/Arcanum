@@ -30,14 +30,14 @@ public class CodexRecipeGui {
         );
 
         String titleStr = "<dark_gray>» " + G_GOLD + toSmallCaps("Recipe: " + item.getDisplayName());
-        Inventory inv = Bukkit.createInventory(holder, 54, MM.deserialize(titleStr));
+        Inventory inv = Bukkit.createInventory(holder, 54, parse(titleStr));
         holder.setInventory(inv);
 
         // Fill background with gray glass
         ItemStack glass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta glassMeta = glass.getItemMeta();
         if (glassMeta != null) {
-            glassMeta.displayName(MM.deserialize(" "));
+            glassMeta.displayName(parse(" "));
             glass.setItemMeta(glassMeta);
         }
         for (int i = 0; i < 54; i++) {
@@ -45,25 +45,38 @@ public class CodexRecipeGui {
         }
 
         // Place Crafting Station (Slot 10)
-        ItemStack station = item.getCraftingStation();
-        if (station == null) {
-            station = new ItemStack(Material.CRAFTING_TABLE);
+        ItemStack station;
+        if (item.getId().startsWith("machinery.")) {
+            station = new ItemStack(Material.BRICKS);
+            ItemMeta stationMeta = station.getItemMeta();
+            if (stationMeta != null) {
+                stationMeta.displayName(parse(C_GOLD + toSmallCaps("Multiblock")));
+                stationMeta.lore(List.of(
+                        MM.deserialize(C_YELLOW + "<bold>" + toSmallCaps("Required Structure"))
+                ));
+                station.setItemMeta(stationMeta);
+            }
         } else {
-            station = station.clone();
-        }
-        ItemMeta stationMeta = station.getItemMeta();
-        if (stationMeta != null) {
-            // Keep the custom name if set, else use default Crafting Station
-            if (!stationMeta.hasDisplayName()) {
-                stationMeta.displayName(MM.deserialize(C_GOLD + toSmallCaps("Crafting Station")));
+            station = item.getCraftingStation();
+            if (station == null) {
+                station = new ItemStack(Material.CRAFTING_TABLE);
+            } else {
+                station = station.clone();
             }
-            List<Component> lore = new ArrayList<>();
-            lore.add(MM.deserialize(C_YELLOW + "<bold>" + toSmallCaps("Required Station")));
-            if (stationMeta.lore() != null) {
-                lore.addAll(stationMeta.lore());
+            ItemMeta stationMeta = station.getItemMeta();
+            if (stationMeta != null) {
+                // Keep the custom name if set, else use default Crafting Station
+                if (!stationMeta.hasDisplayName()) {
+                    stationMeta.displayName(parse(C_GOLD + toSmallCaps("Crafting Station")));
+                }
+                List<Component> lore = new ArrayList<>();
+                lore.add(MM.deserialize(C_YELLOW + "<bold>" + toSmallCaps("Required Station")));
+                if (stationMeta.lore() != null) {
+                    lore.addAll(stationMeta.lore());
+                }
+                stationMeta.lore(lore);
+                station.setItemMeta(stationMeta);
             }
-            stationMeta.lore(lore);
-            station.setItemMeta(stationMeta);
         }
         inv.setItem(10, station);
 
@@ -84,7 +97,7 @@ public class CodexRecipeGui {
                 ItemStack emptySlot = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
                 ItemMeta emptyMeta = emptySlot.getItemMeta();
                 if (emptyMeta != null) {
-                    emptyMeta.displayName(MM.deserialize(C_GRAY + toSmallCaps("Empty Slot")));
+                    emptyMeta.displayName(parse(C_GRAY + toSmallCaps("Empty Slot")));
                     emptySlot.setItemMeta(emptyMeta);
                 }
                 inv.setItem(slot, emptySlot);
@@ -95,7 +108,7 @@ public class CodexRecipeGui {
         ItemStack back = new ItemStack(Material.ARROW);
         ItemMeta backMeta = back.getItemMeta();
         if (backMeta != null) {
-            backMeta.displayName(MM.deserialize(C_RED + toSmallCaps("Back to Category")));
+            backMeta.displayName(parse(C_RED + toSmallCaps("Back to Category")));
             back.setItemMeta(backMeta);
         }
         inv.setItem(45, back);

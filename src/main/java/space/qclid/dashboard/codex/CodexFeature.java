@@ -2,66 +2,38 @@ package space.qclid.dashboard.codex;
 
 import io.papermc.paper.command.brigadier.Commands;
 import org.bukkit.Bukkit;
-import org.bukkit.Color;
-import org.bukkit.FireworkEffect;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
-import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Snowball;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.ProjectileHitEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.PrepareItemCraftEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.meta.FireworkEffectMeta;
+import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import space.qclid.dashboard.PlayerSettings;
 import space.qclid.dashboard.codex.gui.CodexGuiListener;
 import space.qclid.dashboard.codex.gui.CodexMainGui;
-import space.qclid.dashboard.codex.gui.CodexSubCategoryGui;
 import space.qclid.dashboard.data.DataManager;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import static space.qclid.dashboard.util.TextUtil.*;
 
-public class CodexFeature implements Listener {
+public class CodexFeature {
 
     private final JavaPlugin plugin;
     private final DataManager dataManager;
     private final CodexManager manager;
     private final CodexRegistry registry;
 
-    // Track active block structures players are right-clicking
-    private final Map<UUID, String> activeMachine = new HashMap<>();
-
-    // Custom items cache
-    private ItemStack arcanaTableItem;
-    private ItemStack heavyForgeItem;
-    private ItemStack lifestealRuneItem;
-    private ItemStack speedRuneItem;
-    private ItemStack speedBootsItem;
-    private ItemStack wandOfEmbersItem;
-    private ItemStack waypointCompassItem;
-    private ItemStack ironGrappleItem;
-    private ItemStack diamondGrappleItem;
-    private ItemStack netheriteGrappleItem;
+    // Modular handlers
+    private final ArcaneItems arcaneItems;
+    private final ExplorerItems explorerItems;
+    private final CodexCrafting codexCrafting;
+    private final CodexPassiveTask codexPassiveTask;
+    private final CodexListener codexListener;
 
     public CodexFeature(JavaPlugin plugin, DataManager dataManager) {
         this.plugin = plugin;
@@ -69,19 +41,30 @@ public class CodexFeature implements Listener {
         this.manager = new CodexManager(plugin);
         this.registry = new CodexRegistry();
 
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        // Initialize sub-components
+        this.arcaneItems = new ArcaneItems(plugin);
+        this.explorerItems = new ExplorerItems(plugin);
+        this.codexCrafting = new CodexCrafting(plugin, manager, registry, arcaneItems);
+        this.codexPassiveTask = new CodexPassiveTask(plugin);
+        this.codexListener = new CodexListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask);
+
+        // Register listener
+        plugin.getServer().getPluginManager().registerEvents(codexListener, plugin);
 
         // Initialize GUIs listener
         new CodexGuiListener(plugin, registry, manager);
 
         initRegistry();
 
-        // Run passive Speed Boots check every 10 ticks (0.5s)
+        // Run passive Speed Boots, Geode, Cloak, Strider, and Spelunker check every 10 ticks (0.5s)
         plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                updateSpeedRunes(player);
-            }
+            codexPassiveTask.runTick();
         }, 1L, 10L);
+
+        // Run virtual furnace ticking every 20 ticks (1s)
+        plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            codexPassiveTask.runVirtualFurnaceTick();
+        }, 1L, 20L);
     }
 
     public CodexManager getManager() {
@@ -103,45 +86,41 @@ public class CodexFeature implements Listener {
         CodexCategory arcaneRanged = new CodexCategory("arcane.ranged", "arcane", "Ranged Weapons", new ItemStack(Material.BLAZE_ROD));
         CodexCategory arcaneBoosts = new CodexCategory("arcane.boosts", "arcane", "Arcana Boosts", new ItemStack(Material.POTION));
         CodexCategory arcaneIngredients = new CodexCategory("arcane.ingredients", "arcane", "Ingredients", new ItemStack(Material.NETHER_WART));
+        CodexCategory arcaneMaterials = new CodexCategory("arcane.materials", "arcane", "Materials", new ItemStack(Material.ENDER_PEARL));
+        CodexCategory arcaneTrinkets = new CodexCategory("arcane.trinkets", "arcane", "Trinkets", new ItemStack(Material.TOTEM_OF_UNDYING));
         registry.registerCategory(arcaneRunes);
         registry.registerCategory(arcaneArmor);
         registry.registerCategory(arcaneMelee);
         registry.registerCategory(arcaneRanged);
         registry.registerCategory(arcaneBoosts);
         registry.registerCategory(arcaneIngredients);
+        registry.registerCategory(arcaneMaterials);
+        registry.registerCategory(arcaneTrinkets);
 
         CodexCategory explorerNavigation = new CodexCategory("explorer.navigation", "explorer", "Navigation", new ItemStack(Material.COMPASS));
         CodexCategory explorerExploration = new CodexCategory("explorer.exploration", "explorer", "Exploration", new ItemStack(Material.SPYGLASS));
         CodexCategory explorerGadgets = new CodexCategory("explorer.gadgets", "explorer", "Gadgets", new ItemStack(Material.LEAD));
+        CodexCategory explorerTools = new CodexCategory("explorer.tools", "explorer", "Tools", new ItemStack(Material.IRON_PICKAXE));
+        CodexCategory explorerArmor = new CodexCategory("explorer.armor", "explorer", "Armor", new ItemStack(Material.IRON_CHESTPLATE));
         registry.registerCategory(explorerNavigation);
         registry.registerCategory(explorerExploration);
         registry.registerCategory(explorerGadgets);
-
-        // Build items
-        this.arcanaTableItem = createArcanaTableItem();
-        this.heavyForgeItem = createHeavyForgeItem();
-        this.lifestealRuneItem = createLifestealRune();
-        this.speedRuneItem = createSpeedRune();
-        this.speedBootsItem = createSpeedBoots();
-        this.wandOfEmbersItem = createWandOfEmbers();
-        this.waypointCompassItem = createWaypointCompass();
-        this.ironGrappleItem = createGrapplingHook("Iron", C_GRAY, 10.0, "explorer.grappling_hook.iron");
-        this.diamondGrappleItem = createGrapplingHook("Diamond", "<#55FFFF>", 25.0, "explorer.grappling_hook.diamond");
-        this.netheriteGrappleItem = createGrapplingHook("Netherite", C_PURPLE, 50.0, "explorer.grappling_hook.netherite");
+        registry.registerCategory(explorerTools);
+        registry.registerCategory(explorerArmor);
 
         // 1. Arcana Table
         CodexItem arcanaTableCodex = new CodexItem.Builder("machinery.arcana_table")
                 .displayName("Arcana Table")
-                .displayItem(arcanaTableItem)
+                .displayItem(arcaneItems.arcanaTableItem)
                 .xpCost(3)
                 .requires(new ItemStack(Material.CRAFTING_TABLE, 1))
                 .requires(new ItemStack(Material.BOOKSHELF, 2))
-                .description("Crafting station with 2 adjacent Bookshelves horizontally.")
+                .description("Structure: A Crafting Table directly on top of a Dropper with Bookshelves on the sides of the Dropper.")
                 .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
                 .recipe(
-                        null, new ItemStack(Material.BOOK), null,
-                        new ItemStack(Material.BOOKSHELF), new ItemStack(Material.CRAFTING_TABLE), new ItemStack(Material.BOOKSHELF),
-                        null, new ItemStack(Material.BOOK), null
+                        null, new ItemStack(Material.CRAFTING_TABLE), null,
+                        new ItemStack(Material.BOOKSHELF), new ItemStack(Material.DROPPER), new ItemStack(Material.BOOKSHELF),
+                        null, null, null
                 )
                 .build();
         machineryStations.addItem(arcanaTableCodex);
@@ -149,79 +128,164 @@ public class CodexFeature implements Listener {
         // 2. Heavy Forge
         CodexItem heavyForgeCodex = new CodexItem.Builder("machinery.heavy_forge")
                 .displayName("Heavy Forge")
-                .displayItem(heavyForgeItem)
+                .displayItem(explorerItems.heavyForgeItem)
                 .xpCost(3)
                 .requires(new ItemStack(Material.CRAFTING_TABLE, 1))
                 .requires(new ItemStack(Material.BLAST_FURNACE, 1))
-                .description("Crafting station placed directly on top of a Blast Furnace.")
+                .description("Structure: A Crafting Table on top of a Blast Furnace on top of a Dropper.")
                 .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
                 .recipe(
                         null, new ItemStack(Material.CRAFTING_TABLE), null,
-                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.BLAST_FURNACE), new ItemStack(Material.IRON_INGOT),
-                        null, new ItemStack(Material.IRON_INGOT), null
+                        null, new ItemStack(Material.BLAST_FURNACE), null,
+                        null, new ItemStack(Material.DROPPER), null
                 )
                 .build();
         machineryStations.addItem(heavyForgeCodex);
 
-        // 3. Lifesteal Rune
+        // 3. Upgrade Table
+        CodexItem upgradeTableCodex = new CodexItem.Builder("machinery.upgrade_table")
+                .displayName("Upgrade Table")
+                .displayItem(arcaneItems.upgradeTableItem)
+                .xpCost(3)
+                .requires(new ItemStack(Material.ANVIL, 1))
+                .requires(new ItemStack(Material.BOOKSHELF, 1))
+                .description("Structure: An Anvil on top of a Dropper on top of a Bookshelf.")
+                .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
+                .recipe(
+                        null, new ItemStack(Material.ANVIL), null,
+                        null, new ItemStack(Material.DROPPER), null,
+                        null, new ItemStack(Material.BOOKSHELF), null
+                )
+                .build();
+        machineryStations.addItem(upgradeTableCodex);
+
+        // 4. Lifesteal Rune I
         CodexItem lifestealRuneCodex = new CodexItem.Builder("arcane.lifesteal_rune")
                 .displayName("Lifesteal Rune I")
-                .displayItem(lifestealRuneItem)
+                .displayItem(arcaneItems.lifestealRuneItem)
                 .xpCost(8)
                 .requires(new ItemStack(Material.FIREWORK_STAR, 1))
                 .requires(new ItemStack(Material.DIAMOND, 1))
                 .description("Apply to sword. Heals you on hit.")
-                .craftingStation(arcanaTableItem)
+                .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
-                        new ItemStack(Material.REDSTONE), new ItemStack(Material.DIAMOND), new ItemStack(Material.REDSTONE),
-                        new ItemStack(Material.FIREWORK_STAR), new ItemStack(Material.IRON_SWORD), new ItemStack(Material.FIREWORK_STAR),
-                        new ItemStack(Material.REDSTONE), new ItemStack(Material.NETHER_WART), new ItemStack(Material.REDSTONE)
+                        new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK),
+                        new ItemStack(Material.IRON_SWORD), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.DIAMOND_SWORD),
+                        new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK)
                 )
                 .build();
         arcaneRunes.addItem(lifestealRuneCodex);
 
-        // 4. Speed Rune
+        // Lifesteal Rune II
+        ItemStack lifestealRune2Item = arcaneItems.createLifestealRuneOfLevel(2);
+        CodexItem lifestealRune2Codex = new CodexItem.Builder("arcane.lifesteal_rune_2")
+                .displayName("Lifesteal Rune II")
+                .displayItem(lifestealRune2Item)
+                .xpCost(12)
+                .requires(arcaneItems.lifestealRuneItem)
+                .description("Upgraded Lifesteal Rune. Heals you on hit (increased effect).")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK),
+                        new ItemStack(Material.IRON_SWORD), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.DIAMOND_SWORD),
+                        new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(lifestealRune2Codex);
+
+        // Lifesteal Rune III
+        ItemStack lifestealRune3Item = arcaneItems.createLifestealRuneOfLevel(3);
+        CodexItem lifestealRune3Codex = new CodexItem.Builder("arcane.lifesteal_rune_3")
+                .displayName("Lifesteal Rune III")
+                .displayItem(lifestealRune3Item)
+                .xpCost(16)
+                .requires(lifestealRune2Item)
+                .description("Maximum level Lifesteal Rune.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK),
+                        new ItemStack(Material.IRON_SWORD), new ItemStack(Material.GHAST_TEAR), new ItemStack(Material.DIAMOND_SWORD),
+                        new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(lifestealRune3Codex);
+
+        // 5. Speed Rune I
         CodexItem speedRuneCodex = new CodexItem.Builder("arcane.speed_rune")
                 .displayName("Speed Rune I")
-                .displayItem(speedRuneItem)
+                .displayItem(arcaneItems.speedRuneItem)
                 .xpCost(8)
                 .requires(new ItemStack(Material.FIREWORK_STAR, 1))
                 .requires(new ItemStack(Material.SUGAR, 4))
                 .description("Apply to boots. Grants Speed I when worn.")
-                .craftingStation(arcanaTableItem)
+                .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
-                        new ItemStack(Material.SUGAR), new ItemStack(Material.DIAMOND), new ItemStack(Material.SUGAR),
-                        new ItemStack(Material.FIREWORK_STAR), new ItemStack(Material.SUGAR), new ItemStack(Material.FIREWORK_STAR),
-                        new ItemStack(Material.SUGAR), new ItemStack(Material.SUGAR), new ItemStack(Material.SUGAR)
+                        new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK),
+                        new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.RABBIT_FOOT), new ItemStack(Material.DIAMOND_BOOTS),
+                        new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK)
                 )
                 .build();
         arcaneRunes.addItem(speedRuneCodex);
 
-        // 5. Speed Boots
+        // Speed Rune II
+        ItemStack speedRune2Item = arcaneItems.createSpeedRuneOfLevel(2);
+        CodexItem speedRune2Codex = new CodexItem.Builder("arcane.speed_rune_2")
+                .displayName("Speed Rune II")
+                .displayItem(speedRune2Item)
+                .xpCost(12)
+                .requires(arcaneItems.speedRuneItem)
+                .description("Upgraded Speed Rune. Grants Speed II when worn.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK),
+                        new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.RABBIT_FOOT), new ItemStack(Material.DIAMOND_BOOTS),
+                        new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(speedRune2Codex);
+
+        // Speed Rune III
+        ItemStack speedRune3Item = arcaneItems.createSpeedRuneOfLevel(3);
+        CodexItem speedRune3Codex = new CodexItem.Builder("arcane.speed_rune_3")
+                .displayName("Speed Rune III")
+                .displayItem(speedRune3Item)
+                .xpCost(16)
+                .requires(speedRune2Item)
+                .description("Maximum level Speed Rune. Grants Speed III when worn.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK),
+                        new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.RABBIT_FOOT), new ItemStack(Material.DIAMOND_BOOTS),
+                        new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(speedRune3Codex);
+
+        // 6. Speed Boots
         CodexItem speedBootsCodex = new CodexItem.Builder("arcane.speed_boots")
                 .displayName("Speed Boots")
-                .displayItem(speedBootsItem)
+                .displayItem(arcaneItems.speedBootsItem)
                 .xpCost(12)
                 .requires(new ItemStack(Material.DIAMOND_BOOTS, 1))
-                .requires(speedRuneItem)
+                .requires(arcaneItems.speedRuneItem)
                 .description("Diamond boots pre-infused with the Speed Rune.")
-                .craftingStation(arcanaTableItem)
+                .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
-                        speedRuneItem, null, speedRuneItem,
+                        arcaneItems.speedRuneItem, null, arcaneItems.speedRuneItem,
                         null, new ItemStack(Material.DIAMOND_BOOTS), null,
                         null, null, null
                 )
                 .build();
         arcaneArmor.addItem(speedBootsCodex);
 
-        // 6. Wand of Embers
+        // 7. Wand of Embers
         CodexItem wandItem = new CodexItem.Builder("arcane.wand_of_embers")
                 .displayName("Wand of Embers")
-                .displayItem(wandOfEmbersItem)
+                .displayItem(arcaneItems.wandOfEmbersItem)
                 .xpCost(5)
                 .requires(new ItemStack(Material.BLAZE_ROD, 1))
                 .description("A magical wand that shoots fireballs when right-clicked.")
-                .craftingStation(arcanaTableItem)
+                .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
                         new ItemStack(Material.BLAZE_POWDER), new ItemStack(Material.FIRE_CHARGE), new ItemStack(Material.BLAZE_POWDER),
                         new ItemStack(Material.BLAZE_POWDER), new ItemStack(Material.BLAZE_ROD),    new ItemStack(Material.BLAZE_POWDER),
@@ -230,15 +294,15 @@ public class CodexFeature implements Listener {
                 .build();
         arcaneRanged.addItem(wandItem);
 
-        // 7. Waypoint Compass
+        // 8. Waypoint Compass
         CodexItem compassItem = new CodexItem.Builder("explorer.waypoint_compass")
                 .displayName("Waypoint Compass")
-                .displayItem(waypointCompassItem)
+                .displayItem(explorerItems.waypointCompassItem)
                 .xpCost(10)
                 .requires(new ItemStack(Material.COMPASS, 1))
                 .requires(new ItemStack(Material.ENDER_PEARL, 8))
                 .description("A celestial compass that teleports you to its linked waypoint.")
-                .craftingStation(heavyForgeItem)
+                .craftingStation(explorerItems.heavyForgeItem)
                 .recipe(
                         new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_EYE), new ItemStack(Material.ENDER_PEARL),
                         new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.COMPASS),      new ItemStack(Material.ENDER_PEARL),
@@ -247,15 +311,15 @@ public class CodexFeature implements Listener {
                 .build();
         explorerNavigation.addItem(compassItem);
 
-        // 8. Iron Grappling Hook
+        // 9. Iron Grappling Hook
         CodexItem ironGrappleCodex = new CodexItem.Builder("explorer.grappling_hook.iron")
                 .displayName("Iron Grappling Hook")
-                .displayItem(ironGrappleItem)
+                .displayItem(explorerItems.ironGrappleItem)
                 .xpCost(6)
                 .requires(new ItemStack(Material.LEAD, 1))
                 .requires(new ItemStack(Material.TRIPWIRE_HOOK, 2))
                 .description("Grappling hook with a 10-block range.")
-                .craftingStation(heavyForgeItem)
+                .craftingStation(explorerItems.heavyForgeItem)
                 .recipe(
                         new ItemStack(Material.IRON_INGOT), new ItemStack(Material.TRIPWIRE_HOOK), new ItemStack(Material.IRON_INGOT),
                         new ItemStack(Material.LEAD), new ItemStack(Material.LEAD), new ItemStack(Material.LEAD),
@@ -264,340 +328,776 @@ public class CodexFeature implements Listener {
                 .build();
         explorerGadgets.addItem(ironGrappleCodex);
 
-        // 9. Diamond Grappling Hook
+        // 10. Diamond Grappling Hook
         CodexItem diamondGrappleCodex = new CodexItem.Builder("explorer.grappling_hook.diamond")
                 .displayName("Diamond Grappling Hook")
-                .displayItem(diamondGrappleItem)
+                .displayItem(explorerItems.diamondGrappleItem)
                 .xpCost(12)
-                .requires(ironGrappleItem)
+                .requires(explorerItems.ironGrappleItem)
                 .requires(new ItemStack(Material.DIAMOND, 4))
                 .description("Grappling hook with a 25-block range.")
-                .craftingStation(heavyForgeItem)
+                .craftingStation(explorerItems.heavyForgeItem)
                 .recipe(
                         new ItemStack(Material.DIAMOND), new ItemStack(Material.TRIPWIRE_HOOK), new ItemStack(Material.DIAMOND),
-                        new ItemStack(Material.LEAD), ironGrappleItem, new ItemStack(Material.LEAD),
+                        new ItemStack(Material.LEAD), explorerItems.ironGrappleItem, new ItemStack(Material.LEAD),
                         new ItemStack(Material.DIAMOND), new ItemStack(Material.LEAD), new ItemStack(Material.DIAMOND)
                 )
                 .build();
         explorerGadgets.addItem(diamondGrappleCodex);
 
-        // 10. Netherite Grappling Hook
+        // 11. Netherite Grappling Hook
         CodexItem netheriteGrappleCodex = new CodexItem.Builder("explorer.grappling_hook.netherite")
                 .displayName("Netherite Grappling Hook")
-                .displayItem(netheriteGrappleItem)
+                .displayItem(explorerItems.netheriteGrappleItem)
                 .xpCost(20)
-                .requires(diamondGrappleItem)
+                .requires(explorerItems.diamondGrappleItem)
                 .requires(new ItemStack(Material.NETHERITE_INGOT, 4))
                 .description("Grappling hook with a 50-block range.")
-                .craftingStation(heavyForgeItem)
+                .craftingStation(explorerItems.heavyForgeItem)
                 .recipe(
                         new ItemStack(Material.NETHERITE_INGOT), new ItemStack(Material.TRIPWIRE_HOOK), new ItemStack(Material.NETHERITE_INGOT),
-                        new ItemStack(Material.LEAD), diamondGrappleItem, new ItemStack(Material.LEAD),
+                        new ItemStack(Material.LEAD), explorerItems.diamondGrappleItem, new ItemStack(Material.LEAD),
                         new ItemStack(Material.NETHERITE_INGOT), new ItemStack(Material.LEAD), new ItemStack(Material.NETHERITE_INGOT)
                 )
                 .build();
         explorerGadgets.addItem(netheriteGrappleCodex);
 
+        // 12. Ender Essence
+        CodexItem enderEssenceCodex = new CodexItem.Builder("arcane.materials.ender_essence")
+                .displayName("Ender Essence")
+                .displayItem(arcaneItems.enderEssence)
+                .xpCost(5)
+                .requires(new ItemStack(Material.ENDER_PEARL, 9))
+                .description("Condensed ender magic used for advanced arcane crafting.")
+                .craftingStation(new ItemStack(Material.CRAFTING_TABLE))
+                .recipe(
+                        new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_PEARL),
+                        new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_PEARL),
+                        new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.ENDER_PEARL)
+                )
+                .build();
+        arcaneMaterials.addItem(enderEssenceCodex);
+
+        // 13. Hardened Coal I
+        CodexItem hc1 = new CodexItem.Builder("arcane.materials.hardened_coal_1")
+                .displayName("Hardened Coal I")
+                .displayItem(arcaneItems.hardenedCoal1)
+                .xpCost(2)
+                .requires(new ItemStack(Material.COAL, 9))
+                .description("Pressed coal reagent.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.COAL), new ItemStack(Material.COAL), new ItemStack(Material.COAL),
+                        new ItemStack(Material.COAL), new ItemStack(Material.COAL), new ItemStack(Material.COAL),
+                        new ItemStack(Material.COAL), new ItemStack(Material.COAL), new ItemStack(Material.COAL)
+                )
+                .build();
+        arcaneMaterials.addItem(hc1);
+
+        // 14. Hardened Coal II
+        CodexItem hc2 = new CodexItem.Builder("arcane.materials.hardened_coal_2")
+                .displayName("Hardened Coal II")
+                .displayItem(arcaneItems.hardenedCoal2)
+                .xpCost(4)
+                .requires(arcaneItems.hardenedCoal1)
+                .description("Highly pressed coal reagent.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.hardenedCoal1, arcaneItems.hardenedCoal1, arcaneItems.hardenedCoal1,
+                        arcaneItems.hardenedCoal1, arcaneItems.hardenedCoal1, arcaneItems.hardenedCoal1,
+                        arcaneItems.hardenedCoal1, arcaneItems.hardenedCoal1, arcaneItems.hardenedCoal1
+                )
+                .build();
+        arcaneMaterials.addItem(hc2);
+
+        // 15. Hardened Coal Max
+        CodexItem hcMax = new CodexItem.Builder("arcane.materials.hardened_coal_max")
+                .displayName("Hardened Coal Max")
+                .displayItem(arcaneItems.hardenedCoalMax)
+                .xpCost(6)
+                .requires(arcaneItems.hardenedCoal2)
+                .description("Fully crystallized coal reagent ready for diamond forging.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.hardenedCoal2, arcaneItems.hardenedCoal2, arcaneItems.hardenedCoal2,
+                        arcaneItems.hardenedCoal2, arcaneItems.hardenedCoal2, arcaneItems.hardenedCoal2,
+                        arcaneItems.hardenedCoal2, arcaneItems.hardenedCoal2, arcaneItems.hardenedCoal2
+                )
+                .build();
+        arcaneMaterials.addItem(hcMax);
+
+        // 16. Hardened Base I
+        CodexItem hb1 = new CodexItem.Builder("arcane.materials.hardened_base_1")
+                .displayName("Hardened Base I")
+                .displayItem(arcaneItems.hardenedBase1)
+                .xpCost(2)
+                .requires(new ItemStack(Material.CLAY_BALL, 5))
+                .description("Pressed clay-copper base.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.COPPER_INGOT), new ItemStack(Material.CLAY_BALL),     new ItemStack(Material.COPPER_INGOT),
+                        new ItemStack(Material.CLAY_BALL),     new ItemStack(Material.CLAY_BALL),     new ItemStack(Material.CLAY_BALL),
+                        new ItemStack(Material.COPPER_INGOT), new ItemStack(Material.CLAY_BALL),     new ItemStack(Material.COPPER_INGOT)
+                )
+                .build();
+        arcaneMaterials.addItem(hb1);
+
+        // 17. Hardened Base II
+        CodexItem hb2 = new CodexItem.Builder("arcane.materials.hardened_base_2")
+                .displayName("Hardened Base II")
+                .displayItem(arcaneItems.hardenedBase2)
+                .xpCost(4)
+                .requires(arcaneItems.hardenedBase1)
+                .description("Highly pressed clay-copper base.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.hardenedBase1, arcaneItems.hardenedBase1, arcaneItems.hardenedBase1,
+                        arcaneItems.hardenedBase1, arcaneItems.hardenedBase1, arcaneItems.hardenedBase1,
+                        arcaneItems.hardenedBase1, arcaneItems.hardenedBase1, arcaneItems.hardenedBase1
+                )
+                .build();
+        arcaneMaterials.addItem(hb2);
+
+        // 18. Hardened Base Max
+        CodexItem hbMax = new CodexItem.Builder("arcane.materials.hardened_base_max")
+                .displayName("Hardened Base Max")
+                .displayItem(arcaneItems.hardenedBaseMax)
+                .xpCost(6)
+                .requires(arcaneItems.hardenedBase2)
+                .description("Fully crystallized metal-clay compound for emerald forging.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.hardenedBase2, arcaneItems.hardenedBase2, arcaneItems.hardenedBase2,
+                        arcaneItems.hardenedBase2, arcaneItems.hardenedBase2, arcaneItems.hardenedBase2,
+                        arcaneItems.hardenedBase2, arcaneItems.hardenedBase2, arcaneItems.hardenedBase2
+                )
+                .build();
+        arcaneMaterials.addItem(hbMax);
+
+        // 19. Synthetic Diamond
+        CodexItem synDiamond = new CodexItem.Builder("arcane.materials.synthetic_diamond")
+                .displayName("Synthetic Diamond")
+                .displayItem(arcaneItems.syntheticDiamond)
+                .xpCost(15)
+                .requires(new ItemStack(Material.COAL_BLOCK, 1))
+                .description("A dense, artificially forged diamond.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.hardenedCoalMax, arcaneItems.hardenedCoalMax, arcaneItems.hardenedCoalMax,
+                        arcaneItems.hardenedCoalMax, new ItemStack(Material.LAVA_BUCKET), arcaneItems.hardenedCoalMax,
+                        arcaneItems.hardenedCoalMax, arcaneItems.hardenedCoalMax, arcaneItems.hardenedCoalMax
+                )
+                .build();
+        arcaneMaterials.addItem(synDiamond);
+
+        // 20. Synthetic Emerald
+        CodexItem synEmerald = new CodexItem.Builder("arcane.materials.synthetic_emerald")
+                .displayName("Synthetic Emerald")
+                .displayItem(arcaneItems.syntheticEmerald)
+                .xpCost(15)
+                .requires(new ItemStack(Material.EMERALD_ORE, 1))
+                .description("A highly pressurized, artificial emerald.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.hardenedBaseMax, arcaneItems.hardenedBaseMax, arcaneItems.hardenedBaseMax,
+                        arcaneItems.hardenedBaseMax, new ItemStack(Material.SLIME_BLOCK), arcaneItems.hardenedBaseMax,
+                        arcaneItems.hardenedBaseMax, arcaneItems.hardenedBaseMax, arcaneItems.hardenedBaseMax
+                )
+                .build();
+        arcaneMaterials.addItem(synEmerald);
+
+        // 21. Echoing Core
+        CodexItem echoCore = new CodexItem.Builder("arcane.materials.echoing_core")
+                .displayName("Echoing Core")
+                .displayItem(arcaneItems.echoingCore)
+                .xpCost(10)
+                .requires(new ItemStack(Material.ECHO_SHARD, 1))
+                .description("Resonating core used for advanced armor upgrades.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.ECHO_SHARD), new ItemStack(Material.ECHO_SHARD),      new ItemStack(Material.ECHO_SHARD),
+                        new ItemStack(Material.ECHO_SHARD), new ItemStack(Material.HEART_OF_THE_SEA), new ItemStack(Material.ECHO_SHARD),
+                        new ItemStack(Material.ECHO_SHARD), new ItemStack(Material.ECHO_SHARD),      new ItemStack(Material.ECHO_SHARD)
+                )
+                .build();
+        arcaneMaterials.addItem(echoCore);
+
+        // Immolation Totem
+        CodexItem immolationTotemCodex = new CodexItem.Builder("arcane.materials.immolation_totem")
+                .displayName("Immolation Totem")
+                .displayItem(arcaneItems.immolationTotemItem)
+                .xpCost(8)
+                .requires(new ItemStack(Material.GOLD_BLOCK, 1))
+                .requires(new ItemStack(Material.LAVA_BUCKET, 1))
+                .description("A volatile fire reagent made with gold and lava.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.LAVA_BUCKET), new ItemStack(Material.LAVA_BUCKET), new ItemStack(Material.LAVA_BUCKET),
+                        new ItemStack(Material.LAVA_BUCKET), new ItemStack(Material.GOLD_BLOCK),  new ItemStack(Material.LAVA_BUCKET),
+                        new ItemStack(Material.LAVA_BUCKET), new ItemStack(Material.LAVA_BUCKET), new ItemStack(Material.LAVA_BUCKET)
+                )
+                .build();
+        arcaneMaterials.addItem(immolationTotemCodex);
+
+        // Catch Flame Rune I
+        CodexItem catchFlameRuneCodex = new CodexItem.Builder("arcane.runes.catch_flame")
+                .displayName("Catch Flame Rune I")
+                .displayItem(arcaneItems.catchFlameRuneItem)
+                .xpCost(8)
+                .requires(arcaneItems.immolationTotemItem)
+                .description("Apply to weapon. Infuses Fire Aspect II / Flame I; spreads fire to nearby mobs on hit (33% chance).")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK),
+                        new ItemStack(Material.DIAMOND_SWORD), arcaneItems.immolationTotemItem, new ItemStack(Material.BOW),
+                        new ItemStack(Material.BOOK), new ItemStack(Material.BOOK), new ItemStack(Material.BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(catchFlameRuneCodex);
+
+        // Catch Flame Rune II
+        CodexItem catchFlameRune2Codex = new CodexItem.Builder("arcane.runes.catch_flame_2")
+                .displayName("Catch Flame Rune II")
+                .displayItem(arcaneItems.catchFlameRune2Item)
+                .xpCost(12)
+                .requires(arcaneItems.catchFlameRuneItem)
+                .description("Upgraded Catch Flame Rune. Fire spreads to nearby mobs with 66% chance.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK),
+                        new ItemStack(Material.DIAMOND_SWORD), arcaneItems.immolationTotemItem, new ItemStack(Material.BOW),
+                        new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK), new ItemStack(Material.WRITABLE_BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(catchFlameRune2Codex);
+
+        // Catch Flame Rune III
+        CodexItem catchFlameRune3Codex = new CodexItem.Builder("arcane.runes.catch_flame_3")
+                .displayName("Catch Flame Rune III")
+                .displayItem(arcaneItems.catchFlameRune3Item)
+                .xpCost(16)
+                .requires(arcaneItems.catchFlameRune2Item)
+                .description("Maximum level Catch Flame Rune. Fire spreads to nearby mobs with 100% chance.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK),
+                        new ItemStack(Material.DIAMOND_SWORD), arcaneItems.immolationTotemItem, new ItemStack(Material.BOW),
+                        new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK), new ItemStack(Material.ENCHANTED_BOOK)
+                )
+                .build();
+        arcaneRunes.addItem(catchFlameRune3Codex);
+
+        // 22. Staff of Supplant
+        CodexItem staffSupplant = new CodexItem.Builder("arcane.ranged.staff_of_supplant")
+                .displayName("Staff of Supplant")
+                .displayItem(arcaneItems.createStaffOfSupplant())
+                .xpCost(20)
+                .requires(arcaneItems.enderEssence)
+                .description("Shoots a projectile that swaps your position with the target entity.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.BLAZE_POWDER), arcaneItems.enderEssence,                              new ItemStack(Material.BLAZE_POWDER),
+                        arcaneItems.enderEssence,                         new ItemStack(Material.IRON_HOE),          arcaneItems.enderEssence,
+                        new ItemStack(Material.BLAZE_POWDER), arcaneItems.enderEssence,                              new ItemStack(Material.BLAZE_POWDER)
+                )
+                .build();
+        arcaneRanged.addItem(staffSupplant);
+
+        // 23. Amulet of the Phoenix
+        CodexItem amuletPhoenix = new CodexItem.Builder("arcane.trinkets.amulet_of_the_phoenix")
+                .displayName("Amulet of the Phoenix")
+                .displayItem(arcaneItems.createAmuletOfThePhoenix())
+                .xpCost(30)
+                .requires(new ItemStack(Material.TOTEM_OF_UNDYING, 1))
+                .description("Grants totem recovery and fiery explosion knockback. Has 3 uses.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.MAGMA_CREAM), new ItemStack(Material.BLAZE_ROD),       new ItemStack(Material.MAGMA_CREAM),
+                        new ItemStack(Material.GOLD_BLOCK),  new ItemStack(Material.TOTEM_OF_UNDYING), new ItemStack(Material.GOLD_BLOCK),
+                        new ItemStack(Material.MAGMA_CREAM), new ItemStack(Material.BLAZE_ROD),       new ItemStack(Material.MAGMA_CREAM)
+                )
+                .build();
+        arcaneTrinkets.addItem(amuletPhoenix);
+
+        // 24. Totem of Fallacy
+        CodexItem totemFallacy = new CodexItem.Builder("arcane.trinkets.totem_of_fallacy")
+                .displayName("Totem of Fallacy")
+                .displayItem(arcaneItems.createTotemOfFallacy())
+                .xpCost(40)
+                .requires(arcaneItems.syntheticDiamond)
+                .description("Teleports you to spawn. Reduces inventory items' durability to 10%.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.ENDER_EYE),   arcaneItems.syntheticDiamond,                         new ItemStack(Material.ENDER_EYE),
+                        arcaneItems.syntheticEmerald,                     new ItemStack(Material.TOTEM_OF_UNDYING), arcaneItems.syntheticEmerald,
+                        new ItemStack(Material.OBSIDIAN),     new ItemStack(Material.OBSIDIAN),         new ItemStack(Material.OBSIDIAN)
+                )
+                .build();
+        arcaneTrinkets.addItem(totemFallacy);
+
+        // 25. Frostbite Ring
+        CodexItem frostRing = new CodexItem.Builder("arcane.trinkets.frostbite_ring")
+                .displayName("Frostbite Ring")
+                .displayItem(arcaneItems.createFrostbiteRing())
+                .xpCost(12)
+                .requires(new ItemStack(Material.BLUE_ICE, 1))
+                .description("Freezes water beneath your feet; extinguishes hit burning entities.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.GOLD_NUGGET), new ItemStack(Material.BLUE_ICE), new ItemStack(Material.GOLD_NUGGET),
+                        new ItemStack(Material.BLUE_ICE),   null,                              new ItemStack(Material.BLUE_ICE),
+                        new ItemStack(Material.GOLD_NUGGET), new ItemStack(Material.BLUE_ICE), new ItemStack(Material.GOLD_NUGGET)
+                )
+                .build();
+        arcaneTrinkets.addItem(frostRing);
+
+        // 26. Shadow Cloak
+        CodexItem cloak = new CodexItem.Builder("arcane.armor.shadow_cloak")
+                .displayName("Shadow Cloak")
+                .displayItem(arcaneItems.shadowCloak)
+                .xpCost(15)
+                .requires(new ItemStack(Material.BLACK_DYE, 2))
+                .description("Wearable cloak. Invisibility + Speed I when light level < 7.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.BLACK_WOOL), new ItemStack(Material.STRING),     new ItemStack(Material.BLACK_WOOL),
+                        new ItemStack(Material.BLACK_WOOL), new ItemStack(Material.BLACK_WOOL), new ItemStack(Material.BLACK_WOOL),
+                        new ItemStack(Material.BLACK_WOOL), null,                               new ItemStack(Material.BLACK_WOOL)
+                )
+                .build();
+        arcaneArmor.addItem(cloak);
+
+        // 27. Superior Shadow Cloak
+        CodexItem superiorCloak = new CodexItem.Builder("arcane.armor.superior_shadow_cloak")
+                .displayName("Superior Shadow Cloak")
+                .displayItem(arcaneItems.superiorShadowCloak)
+                .xpCost(25)
+                .requires(arcaneItems.shadowCloak)
+                .description("Upgraded cloak. Invisibility + Speed II + Swift Sneak while crouched.")
+                .craftingStation(arcaneItems.upgradeTableItem)
+                .recipe(
+                        new ItemStack(Material.PHANTOM_MEMBRANE), new ItemStack(Material.ECHO_SHARD), new ItemStack(Material.PHANTOM_MEMBRANE),
+                        new ItemStack(Material.ECHO_SHARD),       arcaneItems.shadowCloak,                        new ItemStack(Material.ECHO_SHARD),
+                        new ItemStack(Material.PHANTOM_MEMBRANE), new ItemStack(Material.NETHER_STAR), new ItemStack(Material.PHANTOM_MEMBRANE)
+                )
+                .build();
+        arcaneArmor.addItem(superiorCloak);
+
+        // 28. Venomous Scythe
+        CodexItem scythe = new CodexItem.Builder("arcane.melee.venomous_scythe")
+                .displayName("Armor Scythe")
+                .displayName("Venomous Scythe")
+                .displayItem(arcaneItems.createVenomousScythe())
+                .xpCost(18)
+                .requires(new ItemStack(Material.SPIDER_EYE, 4))
+                .description("Iron hoe scythe applying stacking poison on hit (+extra damage).")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.FERMENTED_SPIDER_EYE),
+                        null,                               new ItemStack(Material.STICK),      null,
+                        null,                               new ItemStack(Material.STICK),      null
+                )
+                .build();
+        arcaneMelee.addItem(scythe);
+
+        // 29. Stormcaller Medallion
+        CodexItem stormMedallion = new CodexItem.Builder("arcane.trinkets.stormcaller_medallion")
+                .displayName("Stormcaller Medallion")
+                .displayItem(arcaneItems.createStormcallerMedallion())
+                .xpCost(20)
+                .requires(new ItemStack(Material.LIGHTNING_ROD, 1))
+                .description("Grants 15% lightning strike chance during storms.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.GOLD_INGOT),     new ItemStack(Material.LIGHTNING_ROD), new ItemStack(Material.GOLD_INGOT),
+                        new ItemStack(Material.LIGHTNING_ROD), new ItemStack(Material.DIAMOND),       new ItemStack(Material.LIGHTNING_ROD),
+                        new ItemStack(Material.GOLD_INGOT),     new ItemStack(Material.LIGHTNING_ROD), new ItemStack(Material.GOLD_INGOT)
+                )
+                .build();
+        arcaneTrinkets.addItem(stormMedallion);
+
+        // 30. Wand of Transmutation
+        CodexItem wandTrans = new CodexItem.Builder("arcane.ranged.wand_of_transmutation")
+                .displayName("Wand of Transmutation")
+                .displayItem(arcaneItems.createWandOfTransmutation())
+                .xpCost(22)
+                .requires(new ItemStack(Material.GOLDEN_APPLE, 1))
+                .description("Beam fires turning hostiles into passive animals for 15s.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.LAPIS_LAZULI), new ItemStack(Material.GOLDEN_APPLE), new ItemStack(Material.LAPIS_LAZULI),
+                        null,                                 new ItemStack(Material.BONE),         null,
+                        null,                                 new ItemStack(Material.BONE),         null
+                )
+                .build();
+        arcaneRanged.addItem(wandTrans);
+
+        // 31. Vitality Geode I
+        CodexItem vg1 = new CodexItem.Builder("arcane.trinkets.vitality_geode_1")
+                .displayName("Vitality Geode I")
+                .displayItem(arcaneItems.geode1)
+                .xpCost(15)
+                .requires(new ItemStack(Material.AMETHYST_SHARD, 4))
+                .description("Increases max health by +4 (2 hearts) while in inventory.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.AMETHYST_CLUSTER), new ItemStack(Material.REDSTONE_BLOCK),
+                        new ItemStack(Material.AMETHYST_CLUSTER), new ItemStack(Material.GHAST_TEAR),      new ItemStack(Material.AMETHYST_CLUSTER),
+                        new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.AMETHYST_CLUSTER), new ItemStack(Material.REDSTONE_BLOCK)
+                )
+                .build();
+        arcaneTrinkets.addItem(vg1);
+
+        // 32. Vitality Geode II
+        CodexItem vg2 = new CodexItem.Builder("arcane.trinkets.vitality_geode_2")
+                .displayName("Vitality Geode II")
+                .displayItem(arcaneItems.geode2)
+                .xpCost(18)
+                .requires(arcaneItems.geode1)
+                .description("Upgraded geode. Increases max health by +10 (5 hearts).")
+                .craftingStation(arcaneItems.upgradeTableItem)
+                .recipe(
+                        new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.REDSTONE_BLOCK),
+                        new ItemStack(Material.REDSTONE_BLOCK), arcaneItems.geode1,                                 new ItemStack(Material.REDSTONE_BLOCK),
+                        new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.REDSTONE_BLOCK), new ItemStack(Material.REDSTONE_BLOCK)
+                )
+                .build();
+        arcaneTrinkets.addItem(vg2);
+
+        // 33. Vitality Geode III
+        CodexItem vg3 = new CodexItem.Builder("arcane.trinkets.vitality_geode_3")
+                .displayName("Vitality Geode III")
+                .displayItem(arcaneItems.geode3)
+                .xpCost(25)
+                .requires(arcaneItems.geode2)
+                .description("Fully upgraded geode. Increases max health by +20 (10 hearts).")
+                .craftingStation(arcaneItems.upgradeTableItem)
+                .recipe(
+                        new ItemStack(Material.NETHER_STAR), new ItemStack(Material.NETHER_STAR), new ItemStack(Material.NETHER_STAR),
+                        new ItemStack(Material.NETHER_STAR), arcaneItems.geode2,                              new ItemStack(Material.NETHER_STAR),
+                        new ItemStack(Material.NETHER_STAR), new ItemStack(Material.NETHER_STAR), new ItemStack(Material.NETHER_STAR)
+                )
+                .build();
+        arcaneTrinkets.addItem(vg3);
+
+        // 34. Spelunker's Helmet
+        CodexItem spelunkerHelmet = new CodexItem.Builder("explorer.armor.spelunkers_helmet")
+                .displayName("Spelunker's Helmet")
+                .displayItem(explorerItems.spelunkersHelmetItem)
+                .xpCost(14)
+                .requires(new ItemStack(Material.GLOWSTONE_DUST, 4))
+                .description("Golden helmet giving Night Vision and highlights hostile mobs.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.GLOWSTONE),     new ItemStack(Material.GOLDEN_HELMET), new ItemStack(Material.GLOWSTONE),
+                        new ItemStack(Material.REDSTONE),      new ItemStack(Material.REDSTONE_LAMP),  new ItemStack(Material.REDSTONE),
+                        null,                                  null,                                  null
+                )
+                .build();
+        explorerArmor.addItem(spelunkerHelmet);
+
+        // 35. Portable Smelter
+        CodexItem smelterItem = new CodexItem.Builder("explorer.tools.portable_smelter")
+                .displayName("Portable Smelter")
+                .displayItem(explorerItems.createPortableUtility(Material.BLAST_FURNACE, "explorer.tools.portable_smelter", "Portable Smelter"))
+                .xpCost(10)
+                .requires(new ItemStack(Material.BLAST_FURNACE, 1))
+                .description("Right-click to open blast furnace; unsmelted items return on close.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.IRON_BLOCK), new ItemStack(Material.BLAST_FURNACE), new ItemStack(Material.IRON_BLOCK),
+                        new ItemStack(Material.REDSTONE),   new ItemStack(Material.LAVA_BUCKET),   new ItemStack(Material.REDSTONE),
+                        new ItemStack(Material.OBSIDIAN),   new ItemStack(Material.OBSIDIAN),      new ItemStack(Material.OBSIDIAN)
+                )
+                .build();
+        explorerTools.addItem(smelterItem);
+
+        // 36. Portable Furnace
+        CodexItem furnaceItem = new CodexItem.Builder("explorer.tools.portable_furnace")
+                .displayName("Portable Furnace")
+                .displayItem(explorerItems.createPortableUtility(Material.FURNACE, "explorer.tools.portable_furnace", "Portable Furnace"))
+                .xpCost(5)
+                .requires(new ItemStack(Material.FURNACE, 1))
+                .description("Right-click to open furnace; unsmelted items return on close.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.COBBLESTONE), new ItemStack(Material.FURNACE),    new ItemStack(Material.COBBLESTONE),
+                        new ItemStack(Material.REDSTONE),    new ItemStack(Material.COAL_BLOCK), new ItemStack(Material.REDSTONE),
+                        new ItemStack(Material.COBBLESTONE), new ItemStack(Material.COBBLESTONE), new ItemStack(Material.COBBLESTONE)
+                )
+                .build();
+        explorerTools.addItem(furnaceItem);
+
+        // 37. Portable Crafting Table
+        CodexItem pcTable = new CodexItem.Builder("explorer.tools.portable_crafting_table")
+                .displayName("Portable Crafting Table")
+                .displayItem(explorerItems.createPortableUtility(Material.CRAFTING_TABLE, "explorer.tools.portable_crafting_table", "Portable Crafting Table"))
+                .xpCost(3)
+                .requires(new ItemStack(Material.CRAFTING_TABLE, 1))
+                .description("Right-click to open crafting grid anywhere.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.LEATHER), new ItemStack(Material.CRAFTING_TABLE), new ItemStack(Material.LEATHER),
+                        new ItemStack(Material.STICK),   new ItemStack(Material.STRING),         new ItemStack(Material.STICK),
+                        null,                            null,                                   null
+                )
+                .build();
+        explorerTools.addItem(pcTable);
+
+        // 38. Portable Anvil
+        CodexItem pcAnvil = new CodexItem.Builder("explorer.tools.portable_anvil")
+                .displayName("Portable Anvil")
+                .displayItem(explorerItems.createPortableUtility(Material.ANVIL, "explorer.tools.portable_anvil", "Portable Anvil"))
+                .xpCost(12)
+                .requires(new ItemStack(Material.ANVIL, 1))
+                .description("Right-click to open anvil repair screen.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.IRON_BLOCK), new ItemStack(Material.ANVIL),    new ItemStack(Material.IRON_BLOCK),
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.REDSTONE), new ItemStack(Material.IRON_INGOT),
+                        new ItemStack(Material.OBSIDIAN),   new ItemStack(Material.OBSIDIAN), new ItemStack(Material.OBSIDIAN)
+                )
+                .build();
+        explorerTools.addItem(pcAnvil);
+
+        // 39. Portable Smithing Table
+        CodexItem pcSmithing = new CodexItem.Builder("explorer.tools.portable_smithing_table")
+                .displayName("Portable Smithing Table")
+                .displayItem(explorerItems.createPortableUtility(Material.SMITHING_TABLE, "explorer.tools.portable_smithing_table", "Portable Smithing Table"))
+                .xpCost(8)
+                .requires(new ItemStack(Material.SMITHING_TABLE, 1))
+                .description("Right-click to open smithing upgrades screen.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.IRON_INGOT),     new ItemStack(Material.SMITHING_TABLE), new ItemStack(Material.IRON_INGOT),
+                        new ItemStack(Material.OAK_PLANKS), new ItemStack(Material.REDSTONE),       new ItemStack(Material.OAK_PLANKS),
+                        null,                                  null,                                   null
+                )
+                .build();
+        explorerTools.addItem(pcSmithing);
+
+        // 40. Portable Grindstone
+        CodexItem pcGrind = new CodexItem.Builder("explorer.tools.portable_grindstone")
+                .displayName("Portable Grindstone")
+                .displayItem(explorerItems.createPortableUtility(Material.GRINDSTONE, "explorer.tools.portable_grindstone", "Portable Grindstone"))
+                .xpCost(6)
+                .requires(new ItemStack(Material.GRINDSTONE, 1))
+                .description("Right-click to open grindstone interface.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.STONE_SLAB), new ItemStack(Material.GRINDSTONE), new ItemStack(Material.STONE_SLAB),
+                        new ItemStack(Material.STICK),      new ItemStack(Material.REDSTONE),   new ItemStack(Material.STICK),
+                        null,                               null,                               null
+                )
+                .build();
+        explorerTools.addItem(pcGrind);
+
+        // 41. Portable Stonecutter
+        CodexItem pcStone = new CodexItem.Builder("explorer.tools.portable_stonecutter")
+                .displayName("Portable Stonecutter")
+                .displayItem(explorerItems.createPortableUtility(Material.STONECUTTER, "explorer.tools.portable_stonecutter", "Portable Stonecutter"))
+                .xpCost(6)
+                .requires(new ItemStack(Material.STONECUTTER, 1))
+                .description("Right-click to open stonecutter interface.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.IRON_INGOT), new ItemStack(Material.STONECUTTER), new ItemStack(Material.IRON_INGOT),
+                        new ItemStack(Material.STONE),      new ItemStack(Material.REDSTONE),    new ItemStack(Material.STONE),
+                        null,                               null,                                null
+                )
+                .build();
+        explorerTools.addItem(pcStone);
+
+        // 42. Depth Strider Flippers
+        CodexItem flippers = new CodexItem.Builder("explorer.gadgets.depth_strider_flippers")
+                .displayName("Depth Strider Flippers")
+                .displayItem(explorerItems.flippersItem)
+                .xpCost(12)
+                .requires(new ItemStack(Material.TURTLE_SCUTE, 1))
+                .description("Gives swim speed & water breathing, but slowness on land.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.TURTLE_SCUTE),            null,                                 new ItemStack(Material.TURTLE_SCUTE),
+                        new ItemStack(Material.PRISMARINE_SHARD), new ItemStack(Material.LEATHER_BOOTS), new ItemStack(Material.PRISMARINE_SHARD),
+                        new ItemStack(Material.KELP),             null,                                 new ItemStack(Material.KELP)
+                )
+                .build();
+        explorerGadgets.addItem(flippers);
+
+        // 43. Builder's Wand
+        CodexItem bWand = new CodexItem.Builder("explorer.tools.builders_wand")
+                .displayName("Builder's Wand")
+                .displayItem(explorerItems.buildersWandItem)
+                .xpCost(18)
+                .requires(new ItemStack(Material.DIAMOND_BLOCK, 1))
+                .description("Right-click face to place up to 9 matching blocks in a line.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        null, new ItemStack(Material.DIAMOND_BLOCK), null,
+                        null, new ItemStack(Material.STICK),         null,
+                        null, new ItemStack(Material.STICK),         null
+                )
+                .build();
+        explorerTools.addItem(bWand);
+
+        // 44a. Potent Spider Web
+        CodexItem potentWebCodex = new CodexItem.Builder("arcane.materials.potent_spider_web")
+                .displayName("Potent Spider Web")
+                .displayItem(arcaneItems.potentSpiderWeb)
+                .xpCost(5)
+                .requires(new ItemStack(Material.COBWEB, 9))
+                .description("Extremely sticky web block used for advanced binding crafts.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.COBWEB), new ItemStack(Material.COBWEB), new ItemStack(Material.COBWEB),
+                        new ItemStack(Material.COBWEB), new ItemStack(Material.COBWEB), new ItemStack(Material.COBWEB),
+                        new ItemStack(Material.COBWEB), new ItemStack(Material.COBWEB), new ItemStack(Material.COBWEB)
+                )
+                .build();
+        arcaneMaterials.addItem(potentWebCodex);
+
+        // 44b. Webber
+        CodexItem webberCodex = new CodexItem.Builder("explorer.tools.webber")
+                .displayName("Webber")
+                .displayItem(explorerItems.webberItem)
+                .xpCost(15)
+                .requires(new ItemStack(Material.COBWEB, 5))
+                .description("Shoots temporary cobwebs (lasts 5s, breakable by sword).")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        arcaneItems.potentSpiderWeb, arcaneItems.potentSpiderWeb, arcaneItems.potentSpiderWeb,
+                        arcaneItems.potentSpiderWeb, new ItemStack(Material.CROSSBOW), arcaneItems.potentSpiderWeb,
+                        arcaneItems.potentSpiderWeb, arcaneItems.potentSpiderWeb, arcaneItems.potentSpiderWeb
+                )
+                .build();
+        explorerTools.addItem(webberCodex);
+
+        // 44c. Web Slingers
+        CodexItem ironSlingerCodex = new CodexItem.Builder("explorer.tools.web_slinger.iron")
+                .displayName("Iron Web Slinger")
+                .displayItem(explorerItems.ironWebSlingerItem)
+                .xpCost(10)
+                .requires(explorerItems.ironGrappleItem)
+                .requires(explorerItems.webberItem)
+                .description("Iron Grappling Hook upgraded to place a fall-breaking cobweb where you land.")
+                .craftingStation(arcaneItems.upgradeTableItem)
+                .recipe(
+                        null, explorerItems.webberItem, null,
+                        null, explorerItems.ironGrappleItem, null,
+                        null, null, null
+                )
+                .build();
+        explorerGadgets.addItem(ironSlingerCodex);
+
+        CodexItem diamondSlingerCodex = new CodexItem.Builder("explorer.tools.web_slinger.diamond")
+                .displayName("Diamond Web Slinger")
+                .displayItem(explorerItems.diamondWebSlingerItem)
+                .xpCost(15)
+                .requires(explorerItems.diamondGrappleItem)
+                .requires(explorerItems.webberItem)
+                .description("Diamond Grappling Hook upgraded to place a fall-breaking cobweb where you land.")
+                .craftingStation(arcaneItems.upgradeTableItem)
+                .recipe(
+                        null, explorerItems.webberItem, null,
+                        null, explorerItems.diamondGrappleItem, null,
+                        null, null, null
+                )
+                .build();
+        explorerGadgets.addItem(diamondSlingerCodex);
+
+        CodexItem netheriteSlingerCodex = new CodexItem.Builder("explorer.tools.web_slinger.netherite")
+                .displayName("Netherite Web Slinger")
+                .displayItem(explorerItems.netheriteWebSlingerItem)
+                .xpCost(20)
+                .requires(explorerItems.netheriteGrappleItem)
+                .requires(explorerItems.webberItem)
+                .description("Netherite Grappling Hook upgraded to place a fall-breaking cobweb where you land.")
+                .craftingStation(arcaneItems.upgradeTableItem)
+                .recipe(
+                        null, explorerItems.webberItem, null,
+                        null, explorerItems.netheriteGrappleItem, null,
+                        null, null, null
+                )
+                .build();
+        explorerGadgets.addItem(netheriteSlingerCodex);
+
+        // 45. Thermal Canteen
+        CodexItem canteen = new CodexItem.Builder("explorer.gadgets.thermal_canteen")
+                .displayName("Thermal Canteen")
+                .displayItem(explorerItems.canteenItem)
+                .xpCost(8)
+                .requires(new ItemStack(Material.MAGMA_CREAM, 1))
+                .description("Flask cures effects and restores hunger. Refill at campfire/lava.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.IRON_NUGGET), new ItemStack(Material.MAGMA_CREAM),  new ItemStack(Material.IRON_NUGGET),
+                        new ItemStack(Material.GLASS),       new ItemStack(Material.GLASS_BOTTLE), new ItemStack(Material.GLASS),
+                        new ItemStack(Material.IRON_NUGGET), new ItemStack(Material.IRON_NUGGET),  new ItemStack(Material.IRON_NUGGET)
+                )
+                .build();
+        explorerGadgets.addItem(canteen);
+
+        // 46. Beastmaster's Flute
+        CodexItem flute = new CodexItem.Builder("explorer.tools.beastmasters_flute")
+                .displayName("Beastmaster's Flute")
+                .displayItem(explorerItems.fluteItem)
+                .xpCost(20)
+                .requires(new ItemStack(Material.NOTE_BLOCK, 1))
+                .description("Pacifies/sleeps hostiles in a 5-block radius. Cooldown: 60s.")
+                .craftingStation(arcaneItems.arcanaTableItem)
+                .recipe(
+                        null,                          new ItemStack(Material.BAMBOO),     new ItemStack(Material.STRING),
+                        null,                          new ItemStack(Material.BAMBOO),     new ItemStack(Material.NOTE_BLOCK),
+                        new ItemStack(Material.BAMBOO), null,                              null
+                )
+                .build();
+        explorerTools.addItem(flute);
+
+        // 47. Excavation Drill
+        CodexItem drill = new CodexItem.Builder("explorer.tools.excavation_drill")
+                .displayName("Excavation Drill")
+                .displayItem(explorerItems.drillItem)
+                .xpCost(25)
+                .requires(new ItemStack(Material.DIAMOND_PICKAXE, 1))
+                .description("Heavy 3x3 block-breaking pickaxe.")
+                .craftingStation(explorerItems.heavyForgeItem)
+                .recipe(
+                        new ItemStack(Material.DIAMOND),  new ItemStack(Material.IRON_BLOCK),   new ItemStack(Material.DIAMOND),
+                        new ItemStack(Material.REDSTONE), new ItemStack(Material.IRON_PICKAXE), new ItemStack(Material.REDSTONE),
+                        null,                             new ItemStack(Material.STICK),        null
+                )
+                .build();
+        explorerTools.addItem(drill);
+
         registerRecipes();
     }
 
-    private ItemStack createArcanaTableItem() {
-        ItemStack table = new ItemStack(Material.CRAFTING_TABLE);
-        ItemMeta meta = table.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "machinery.arcana_table");
-            meta.displayName(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps("Arcana Table")));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("A placed Crafting Table with at least")),
-                    MM.deserialize(C_GRAY + toSmallCaps("2 Bookshelves horizontally adjacent to it."))
-            ));
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-            table.setItemMeta(meta);
-        }
-        return table;
-    }
-
-    private ItemStack createHeavyForgeItem() {
-        ItemStack forge = new ItemStack(Material.BLAST_FURNACE);
-        ItemMeta meta = forge.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "machinery.heavy_forge");
-            meta.displayName(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps("Heavy Forge")));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("A placed Crafting Table directly on top")),
-                    MM.deserialize(C_GRAY + toSmallCaps("of a Blast Furnace."))
-            ));
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-            forge.setItemMeta(meta);
-        }
-        return forge;
-    }
-
-    private ItemStack createLifestealRune() {
-        ItemStack star = new ItemStack(Material.FIREWORK_STAR);
-        FireworkEffectMeta meta = (FireworkEffectMeta) star.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "arcane.lifesteal_rune");
-            NamespacedKey typeKey = new NamespacedKey(plugin, "rune_type");
-            meta.getPersistentDataContainer().set(typeKey, PersistentDataType.STRING, "WEAPON_SWORD");
-            NamespacedKey effectKey = new NamespacedKey(plugin, "rune_effect");
-            meta.getPersistentDataContainer().set(effectKey, PersistentDataType.STRING, "lifesteal");
-            NamespacedKey lvlKey = new NamespacedKey(plugin, "rune_level");
-            meta.getPersistentDataContainer().set(lvlKey, PersistentDataType.INTEGER, 1);
-
-            meta.displayName(MM.deserialize(C_PURPLE + toSmallCaps("Enchantment Rune") + C_GRAY + " (" + C_RED + toSmallCaps("Lifesteal I") + C_GRAY + ")"));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("Type") + ": " + C_PURPLE + toSmallCaps("Weapon-Sword")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_GRAY + toSmallCaps("Hold in main hand and swap with")),
-                    MM.deserialize(C_GRAY + toSmallCaps("sword in off-hand to apply.")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_YELLOW + toSmallCaps("Lifesteal I") + ": " + C_GRAY + toSmallCaps("Heals on attack."))
-            ));
-
-            // Custom burst color (red & purple)
-            meta.setEffect(FireworkEffect.builder()
-                    .withColor(Color.RED, Color.PURPLE)
-                    .with(FireworkEffect.Type.BURST)
-                    .build());
-
-            star.setItemMeta(meta);
-        }
-        return star;
-    }
-
-    private ItemStack createSpeedRune() {
-        ItemStack star = new ItemStack(Material.FIREWORK_STAR);
-        FireworkEffectMeta meta = (FireworkEffectMeta) star.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "arcane.speed_rune");
-            NamespacedKey typeKey = new NamespacedKey(plugin, "rune_type");
-            meta.getPersistentDataContainer().set(typeKey, PersistentDataType.STRING, "ARMOR_BOOTS");
-            NamespacedKey effectKey = new NamespacedKey(plugin, "rune_effect");
-            meta.getPersistentDataContainer().set(effectKey, PersistentDataType.STRING, "speed");
-            NamespacedKey lvlKey = new NamespacedKey(plugin, "rune_level");
-            meta.getPersistentDataContainer().set(lvlKey, PersistentDataType.INTEGER, 1);
-
-            meta.displayName(MM.deserialize(C_PURPLE + toSmallCaps("Enchantment Rune") + C_GRAY + " (" + "<#55FFFF>" + toSmallCaps("Speed I") + C_GRAY + ")"));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("Type") + ": " + C_PURPLE + toSmallCaps("Armor-Boots")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_GRAY + toSmallCaps("Hold in main hand and swap with")),
-                    MM.deserialize(C_GRAY + toSmallCaps("boots in off-hand to apply.")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_YELLOW + toSmallCaps("Speed I") + ": " + C_GRAY + toSmallCaps("Grants Speed I when worn."))
-            ));
-
-            // Custom ball color (aqua & yellow)
-            meta.setEffect(FireworkEffect.builder()
-                    .withColor(Color.AQUA, Color.YELLOW)
-                    .with(FireworkEffect.Type.BALL)
-                    .build());
-
-            star.setItemMeta(meta);
-        }
-        return star;
-    }
-
-    private ItemStack createSpeedBoots() {
-        ItemStack boots = new ItemStack(Material.DIAMOND_BOOTS);
-        ItemMeta meta = boots.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "arcane.speed_boots");
-            NamespacedKey speedKey = new NamespacedKey(plugin, "rune_speed");
-            meta.getPersistentDataContainer().set(speedKey, PersistentDataType.INTEGER, 1);
-
-            meta.displayName(MM.deserialize(C_PURPLE + "<bold>" + toSmallCaps("Speed Boots")));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("Diamond boots infused with swiftness.")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_PURPLE + toSmallCaps("Speed I") + " " + C_GRAY + toSmallCaps("(Applied)"))
-            ));
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-            boots.setItemMeta(meta);
-        }
-        return boots;
-    }
-
-    private ItemStack createWandOfEmbers() {
-        ItemStack wand = new ItemStack(Material.BLAZE_ROD);
-        ItemMeta meta = wand.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "arcane.wand_of_embers");
-            meta.displayName(MM.deserialize(C_PURPLE + "<bold>" + toSmallCaps("Wand of Embers")));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("A magical wand crafted from nether embers.")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_YELLOW + toSmallCaps("Right-click to cast fireballs."))
-            ));
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-            wand.setItemMeta(meta);
-        }
-        return wand;
-    }
-
-    private ItemStack createWaypointCompass() {
-        ItemStack compass = new ItemStack(Material.COMPASS);
-        ItemMeta meta = compass.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "explorer.waypoint_compass");
-            meta.displayName(MM.deserialize(G_GOLD + "<bold>" + toSmallCaps("Waypoint Compass")));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("A celestial compass that aligns with waypoints.")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_YELLOW + toSmallCaps("Right-click to teleport to the linked waypoint.")),
-                    MM.deserialize(C_GRAY + toSmallCaps("Shift-Right-click to link a waypoint."))
-            ));
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-            compass.setItemMeta(meta);
-        }
-        return compass;
-    }
-
-    private ItemStack createGrapplingHook(String tier, String color, double range, String itemId) {
-        ItemStack lead = new ItemStack(Material.LEAD);
-        ItemMeta meta = lead.getItemMeta();
-        if (meta != null) {
-            NamespacedKey key = new NamespacedKey(plugin, "item_id");
-            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, itemId);
-            meta.displayName(MM.deserialize(color + "<bold>" + toSmallCaps(tier + " Grappling Hook")));
-            meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("A visual grappling hook that pulls you.")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_YELLOW + toSmallCaps("Range") + ": " + C_ORANGE + (int) range + " " + toSmallCaps("blocks")),
-                    MM.deserialize(""),
-                    MM.deserialize(C_GRAY + toSmallCaps("Right-click to launch."))
-            ));
-            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
-            lead.setItemMeta(meta);
-        }
-        return lead;
-    }
-
     private void registerRecipes() {
-        // 1. Arcana Table Shaped Recipe
-        NamespacedKey tableKey = new NamespacedKey(plugin, "recipe_arcana_table");
-        if (Bukkit.getRecipe(tableKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(tableKey, arcanaTableItem);
-            recipe.shape(" B ", "LTL", " B ");
-            recipe.setIngredient('B', Material.BOOK);
-            recipe.setIngredient('L', Material.BOOKSHELF);
-            recipe.setIngredient('T', Material.CRAFTING_TABLE);
+        // 4. Ender Essence Shaped Recipe (Vanilla Crafting Table)
+        NamespacedKey enderEssKey = new NamespacedKey(plugin, "recipe_ender_essence");
+        if (Bukkit.getRecipe(enderEssKey) == null) {
+            ShapedRecipe recipe = new ShapedRecipe(enderEssKey, arcaneItems.enderEssence);
+            recipe.shape("PPP", "PPP", "PPP");
+            recipe.setIngredient('P', Material.ENDER_PEARL);
             Bukkit.addRecipe(recipe);
         }
 
-        // 2. Heavy Forge Shaped Recipe
-        NamespacedKey forgeKey = new NamespacedKey(plugin, "recipe_heavy_forge");
-        if (Bukkit.getRecipe(forgeKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(forgeKey, heavyForgeItem);
-            recipe.shape(" T ", "IFI", " I ");
-            recipe.setIngredient('T', Material.CRAFTING_TABLE);
-            recipe.setIngredient('I', Material.IRON_INGOT);
-            recipe.setIngredient('F', Material.BLAST_FURNACE);
+        // 5. Reverse Ender Essence Shapeless Recipe (Vanilla Crafting Table)
+        NamespacedKey revEnderKey = new NamespacedKey(plugin, "recipe_reverse_ender_essence");
+        if (Bukkit.getRecipe(revEnderKey) == null) {
+            ShapelessRecipe recipe = new ShapelessRecipe(revEnderKey, new ItemStack(Material.ENDER_PEARL, 9));
+            recipe.addIngredient(new RecipeChoice.ExactChoice(arcaneItems.enderEssence));
             Bukkit.addRecipe(recipe);
         }
 
-        // 3. Lifesteal Rune Recipe
-        NamespacedKey lifestealKey = new NamespacedKey(plugin, "recipe_lifesteal_rune");
-        if (Bukkit.getRecipe(lifestealKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(lifestealKey, lifestealRuneItem);
-            recipe.shape("RDR", "SWS", "RNR");
-            recipe.setIngredient('R', Material.REDSTONE);
-            recipe.setIngredient('D', Material.DIAMOND);
-            recipe.setIngredient('S', Material.FIREWORK_STAR);
-            recipe.setIngredient('W', Material.IRON_SWORD);
-            recipe.setIngredient('N', Material.NETHER_WART);
-            Bukkit.addRecipe(recipe);
-        }
-
-        // 4. Speed Rune Recipe
-        NamespacedKey speedRuneKey = new NamespacedKey(plugin, "recipe_speed_rune");
-        if (Bukkit.getRecipe(speedRuneKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(speedRuneKey, speedRuneItem);
-            recipe.shape("SDS", "SGS", "SSS");
-            recipe.setIngredient('S', Material.SUGAR);
-            recipe.setIngredient('D', Material.DIAMOND);
-            recipe.setIngredient('G', Material.FIREWORK_STAR);
-            Bukkit.addRecipe(recipe);
-        }
-
-        // 5. Speed Boots Recipe
-        NamespacedKey speedBootsKey = new NamespacedKey(plugin, "recipe_speed_boots");
-        if (Bukkit.getRecipe(speedBootsKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(speedBootsKey, speedBootsItem);
-            recipe.shape("R R", " B ", "   ");
-            recipe.setIngredient('R', Material.FIREWORK_STAR); // Validate in PrepareItemCraft Event
-            recipe.setIngredient('B', Material.DIAMOND_BOOTS);
-            Bukkit.addRecipe(recipe);
-        }
-
-        // 6. Wand of Embers Shaped Recipe
-        NamespacedKey wandKey = new NamespacedKey(plugin, "recipe_wand_of_embers");
-        if (Bukkit.getRecipe(wandKey) == null) {
-            ShapedRecipe wandRecipe = new ShapedRecipe(wandKey, wandOfEmbersItem);
-            wandRecipe.shape("PFP", "PRP", "PRP");
-            wandRecipe.setIngredient('P', Material.BLAZE_POWDER);
-            wandRecipe.setIngredient('F', Material.FIRE_CHARGE);
-            wandRecipe.setIngredient('R', Material.BLAZE_ROD);
-            Bukkit.addRecipe(wandRecipe);
-        }
-
-        // 7. Waypoint Compass Shaped Recipe
-        NamespacedKey compassKey = new NamespacedKey(plugin, "recipe_waypoint_compass");
-        if (Bukkit.getRecipe(compassKey) == null) {
-            ShapedRecipe compassRecipe = new ShapedRecipe(compassKey, waypointCompassItem);
-            compassRecipe.shape("PEP", "PCP", "PPP");
-            compassRecipe.setIngredient('P', Material.ENDER_PEARL);
-            compassRecipe.setIngredient('E', Material.ENDER_EYE);
-            compassRecipe.setIngredient('C', Material.COMPASS);
-            Bukkit.addRecipe(compassRecipe);
-        }
-
-        // 8. Iron Grappling Hook Recipe
-        NamespacedKey ironGrappleKey = new NamespacedKey(plugin, "recipe_iron_grapple");
-        if (Bukkit.getRecipe(ironGrappleKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(ironGrappleKey, ironGrappleItem);
-            recipe.shape("IHI", "LLL", "ILI");
-            recipe.setIngredient('I', Material.IRON_INGOT);
-            recipe.setIngredient('H', Material.TRIPWIRE_HOOK);
-            recipe.setIngredient('L', Material.LEAD);
-            Bukkit.addRecipe(recipe);
-        }
-
-        // 9. Diamond Grappling Hook Recipe
-        NamespacedKey diamondGrappleKey = new NamespacedKey(plugin, "recipe_diamond_grapple");
-        if (Bukkit.getRecipe(diamondGrappleKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(diamondGrappleKey, diamondGrappleItem);
-            recipe.shape("DHD", "LGL", "DLD");
-            recipe.setIngredient('D', Material.DIAMOND);
-            recipe.setIngredient('H', Material.TRIPWIRE_HOOK);
-            recipe.setIngredient('L', Material.LEAD);
-            recipe.setIngredient('G', Material.LEAD); // Enforced as Iron Grapple in PrepareItemCraft Event
-            Bukkit.addRecipe(recipe);
-        }
-
-        // 10. Netherite Grappling Hook Recipe
-        NamespacedKey netheriteGrappleKey = new NamespacedKey(plugin, "recipe_netherite_grapple");
-        if (Bukkit.getRecipe(netheriteGrappleKey) == null) {
-            ShapedRecipe recipe = new ShapedRecipe(netheriteGrappleKey, netheriteGrappleItem);
-            recipe.shape("NHN", "LGL", "NLN");
-            recipe.setIngredient('N', Material.NETHERITE_INGOT);
-            recipe.setIngredient('H', Material.TRIPWIRE_HOOK);
-            recipe.setIngredient('L', Material.LEAD);
-            recipe.setIngredient('G', Material.LEAD); // Enforced as Diamond Grapple in PrepareItemCraft Event
+        // 6. Cobweb Shapeless Recipe (Vanilla Crafting Table)
+        NamespacedKey cobwebKey = new NamespacedKey(plugin, "recipe_cobweb");
+        if (Bukkit.getRecipe(cobwebKey) == null) {
+            ShapelessRecipe recipe = new ShapelessRecipe(cobwebKey, new ItemStack(Material.COBWEB));
+            recipe.addIngredient(Material.STRING);
+            recipe.addIngredient(Material.STRING);
+            recipe.addIngredient(Material.STRING);
+            recipe.addIngredient(Material.STRING);
             Bukkit.addRecipe(recipe);
         }
     }
@@ -609,6 +1109,107 @@ public class CodexFeature implements Listener {
                     giveCodex(player);
                     return 1;
                 }).build(), "Receive the Codex guide book", List.of());
+
+        commands.register(Commands.literal("codexitem")
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                    if (!player.isOp() && !player.hasPermission("dashboard.admin")) {
+                        player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You do not have permission to use this command!")));
+                        return 1;
+                    }
+                    player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Usage: /codexitem <category> <subcategory> <item>")));
+                    return 1;
+                })
+                .then(Commands.argument("category", com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return builder.buildFuture();
+                            if (!player.isOp() && !player.hasPermission("dashboard.admin")) return builder.buildFuture();
+
+                            String remaining = builder.getRemaining().toLowerCase();
+                            registry.getCategories().stream()
+                                    .map(CodexCategory::getParentCategoryId)
+                                    .distinct()
+                                    .filter(c -> c.toLowerCase().startsWith(remaining))
+                                    .forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                            if (!player.isOp() && !player.hasPermission("dashboard.admin")) {
+                                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You do not have permission to use this command!")));
+                                return 1;
+                            }
+                            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Usage: /codexitem <category> <subcategory> <item>")));
+                            return 1;
+                        })
+                        .then(Commands.argument("subcategory", com.mojang.brigadier.arguments.StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    if (!(ctx.getSource().getSender() instanceof Player player)) return builder.buildFuture();
+                                    if (!player.isOp() && !player.hasPermission("dashboard.admin")) return builder.buildFuture();
+
+                                    String category = ctx.getArgument("category", String.class);
+                                    String remaining = builder.getRemaining().toLowerCase();
+
+                                    registry.getCategories().stream()
+                                            .filter(c -> c.getParentCategoryId().equalsIgnoreCase(category))
+                                            .map(CodexCategory::getId)
+                                            .filter(id -> id.toLowerCase().startsWith(remaining))
+                                            .forEach(builder::suggest);
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx -> {
+                                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                                    if (!player.isOp() && !player.hasPermission("dashboard.admin")) {
+                                        player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You do not have permission to use this command!")));
+                                        return 1;
+                                    }
+                                    player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Usage: /codexitem <category> <subcategory> <item>")));
+                                    return 1;
+                                })
+                                .then(Commands.argument("item", com.mojang.brigadier.arguments.StringArgumentType.word())
+                                        .suggests((ctx, builder) -> {
+                                            if (!(ctx.getSource().getSender() instanceof Player player)) return builder.buildFuture();
+                                            if (!player.isOp() && !player.hasPermission("dashboard.admin")) return builder.buildFuture();
+
+                                            String subcategory = ctx.getArgument("subcategory", String.class);
+                                            String remaining = builder.getRemaining().toLowerCase();
+
+                                            CodexCategory cat = registry.getCategory(subcategory);
+                                            if (cat != null) {
+                                                cat.getItems().stream()
+                                                        .map(CodexItem::getId)
+                                                        .filter(id -> id.toLowerCase().startsWith(remaining))
+                                                        .forEach(builder::suggest);
+                                            }
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(ctx -> {
+                                            if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                                            if (!player.isOp() && !player.hasPermission("dashboard.admin")) {
+                                                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You do not have permission to use this command!")));
+                                                return 1;
+                                            }
+
+                                            String itemId = ctx.getArgument("item", String.class);
+                                            CodexItem item = registry.getItem(itemId);
+                                            if (item == null) {
+                                                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Item not found: ") + itemId));
+                                                return 1;
+                                            }
+
+                                            ItemStack stack = item.getDisplayItem().clone();
+                                            if (player.getInventory().firstEmpty() == -1) {
+                                                player.getWorld().dropItemNaturally(player.getLocation(), stack);
+                                            } else {
+                                                player.getInventory().addItem(stack);
+                                            }
+                                            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1f, 1f);
+                                            player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Gave you: ") + item.getDisplayName()));
+                                            return 1;
+                                        })
+                                )
+                        )
+                ).build(), "Give a custom codex item", List.of());
     }
 
     private void giveCodex(Player player) {
@@ -617,7 +1218,7 @@ public class CodexFeature implements Listener {
         if (meta != null) {
             NamespacedKey key = new NamespacedKey(plugin, "codex");
             meta.getPersistentDataContainer().set(key, PersistentDataType.BOOLEAN, true);
-            meta.displayName(MM.deserialize(G_GOLD + "<bold>" + toSmallCaps("The Codex")));
+            meta.displayName(parse(G_GOLD + "<bold>" + toSmallCaps("The Codex")));
             meta.lore(List.of(
                     MM.deserialize(C_GRAY + toSmallCaps("Right-click to open your guide book.")),
                     MM.deserialize(""),
@@ -635,491 +1236,5 @@ public class CodexFeature implements Listener {
         }
         player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
         player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Given the Codex!")));
-    }
-
-    @EventHandler
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-
-        // ── Structure detection: right-clicking a crafting table block ──────────
-        // This is handled in the same handler to avoid double-firing issues.
-        if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
-            org.bukkit.block.Block clickedBlock = event.getClickedBlock();
-            if (clickedBlock != null && clickedBlock.getType() == Material.CRAFTING_TABLE) {
-                // If holding a custom grappling hook lead, allow the block interaction
-                // to proceed normally — but don't treat it as a machine open.
-                ItemStack heldItem = event.getItem();
-                boolean holdingCustomLead = false;
-                if (heldItem != null && heldItem.getType() == Material.LEAD) {
-                    ItemMeta heldMeta = heldItem.getItemMeta();
-                    if (heldMeta != null) {
-                        NamespacedKey hk = new NamespacedKey(plugin, "item_id");
-                        holdingCustomLead = heldMeta.getPersistentDataContainer().has(hk, PersistentDataType.STRING);
-                    }
-                }
-                if (!holdingCustomLead) {
-                    String structure = detectStructure(clickedBlock);
-                    activeMachine.put(player.getUniqueId(), structure);
-                    if (structure.equals("arcane_table")) {
-                        player.sendActionBar(MM.deserialize(C_PURPLE + toSmallCaps("Using: Arcana Table")));
-                        player.playSound(clickedBlock.getLocation(), Sound.BLOCK_BEACON_AMBIENT, 0.5f, 1.5f);
-                    } else if (structure.equals("heavy_forge")) {
-                        player.sendActionBar(MM.deserialize(C_GOLD + toSmallCaps("Using: Heavy Forge")));
-                        player.playSound(clickedBlock.getLocation(), Sound.BLOCK_BLASTFURNACE_FIRE_CRACKLE, 0.8f, 1.2f);
-                    }
-                }
-            }
-        }
-
-        // ── Custom item handling ───────────────────────────────────────────────
-        ItemStack item = event.getItem();
-        if (item == null || item.getType() == Material.AIR) return;
-
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return;
-
-        // 1. Right-click Codex Book
-        NamespacedKey codexKey = new NamespacedKey(plugin, "codex");
-        if (meta.getPersistentDataContainer().has(codexKey, PersistentDataType.BOOLEAN)) {
-            event.setCancelled(true);
-            if (event.getAction().name().contains("RIGHT")) {
-                player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
-                CodexMainGui.open(player, registry);
-            }
-            return;
-        }
-
-        // 2. Custom Codex Items — only fire on right-click
-        NamespacedKey itemKey = new NamespacedKey(plugin, "item_id");
-        String itemId = meta.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
-        if (itemId == null) return;
-
-        if (!event.getAction().name().contains("RIGHT")) return;
-
-        // Grappling Hook — cancel if targeting a fence post or animal to preserve vanilla lead behaviour
-        if (itemId.startsWith("explorer.grappling_hook.")) {
-            org.bukkit.block.Block target = event.getClickedBlock();
-            if (target != null) {
-                String targetName = target.getType().name();
-                if (targetName.contains("FENCE") || targetName.contains("WALL")) {
-                    // Let vanilla handle leashing to fence posts
-                    return;
-                }
-            }
-            // Also abort if the player right-clicked an entity (handled by EntityInteract, not here)
-
-            event.setCancelled(true);
-            if (player.hasCooldown(Material.LEAD)) return;
-
-            double range = 10.0;
-            if (itemId.endsWith("diamond")) range = 25.0;
-            else if (itemId.endsWith("netherite")) range = 50.0;
-
-            // Shoot projectile
-            Snowball snowball = player.launchProjectile(Snowball.class);
-            snowball.setMetadata("grapple_range", new FixedMetadataValue(plugin, range));
-            snowball.setMetadata("grapple_owner", new FixedMetadataValue(plugin, player.getUniqueId()));
-
-            // Spawn invisible leash ArmorStand as the visual wire anchor
-            ArmorStand stand = player.getWorld().spawn(player.getEyeLocation(), ArmorStand.class, s -> {
-                s.setInvisible(true);
-                s.setMarker(true);
-                s.setGravity(false);
-                s.setSilent(true);
-                s.setPersistent(false);
-            });
-            stand.setLeashHolder(player);
-
-            player.setCooldown(Material.LEAD, 80); // 4 s cooldown
-            player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
-
-            final Snowball finalSnowball = snowball;
-            final ArmorStand finalStand = stand;
-            final double finalRange = range;
-
-            plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, t -> {
-                if (!finalSnowball.isValid() || finalSnowball.isDead() || !finalStand.isValid() || !player.isOnline()) {
-                    t.cancel();
-                    if (finalStand.isValid()) finalStand.remove();
-                    return;
-                }
-                finalStand.teleport(finalSnowball.getLocation());
-                if (player.getLocation().distance(finalSnowball.getLocation()) > finalRange) {
-                    t.cancel();
-                    finalSnowball.remove();
-                    if (finalStand.isValid()) finalStand.remove();
-                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.5f, 1.5f);
-                }
-            }, 1L, 1L);
-            return;
-        }
-
-        if (itemId.equals("arcane.wand_of_embers")) {
-            event.setCancelled(true);
-            if (player.hasCooldown(Material.BLAZE_ROD)) return;
-            player.launchProjectile(org.bukkit.entity.SmallFireball.class);
-            player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1f, 1f);
-            player.setCooldown(Material.BLAZE_ROD, 30); // 1.5 s cooldown
-        } else if (itemId.equals("explorer.waypoint_compass")) {
-            event.setCancelled(true);
-            if (player.hasCooldown(Material.COMPASS)) return;
-            NamespacedKey linkKey = new NamespacedKey(plugin, "linked_waypoint");
-            String linkedWp = meta.getPersistentDataContainer().get(linkKey, PersistentDataType.STRING);
-            if (player.isSneaking() || linkedWp == null) {
-                openWaypointLinkGui(player);
-            } else {
-                teleportToWaypoint(player, linkedWp, item);
-            }
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        // Only clear the active machine state when the player closes a crafting
-        // inventory — NOT when they close a chest, the Codex GUI, etc.
-        if (!(event.getPlayer() instanceof Player player)) return;
-        org.bukkit.event.inventory.InventoryType type = event.getInventory().getType();
-        if (type == org.bukkit.event.inventory.InventoryType.WORKBENCH
-                || type == org.bukkit.event.inventory.InventoryType.CRAFTING) {
-            activeMachine.remove(player.getUniqueId());
-        }
-    }
-
-    private String detectStructure(org.bukkit.block.Block craftingTable) {
-        // 1. Heavy Forge: Crafting Table on top of Blast Furnace
-        org.bukkit.block.Block below = craftingTable.getRelative(org.bukkit.block.BlockFace.DOWN);
-        if (below.getType() == Material.BLAST_FURNACE) {
-            return "heavy_forge";
-        }
-
-        // 2. Arcana Table: Crafting Table horizontally adjacent to at least 2 Bookshelves
-        int bookshelves = 0;
-        org.bukkit.block.BlockFace[] faces = {
-                org.bukkit.block.BlockFace.NORTH,
-                org.bukkit.block.BlockFace.SOUTH,
-                org.bukkit.block.BlockFace.EAST,
-                org.bukkit.block.BlockFace.WEST
-        };
-        for (org.bukkit.block.BlockFace face : faces) {
-            if (craftingTable.getRelative(face).getType() == Material.BOOKSHELF) {
-                bookshelves++;
-            }
-        }
-        if (bookshelves >= 2) {
-            return "arcane_table";
-        }
-
-        return "none";
-    }
-
-    @EventHandler
-    public void onProjectileHit(ProjectileHitEvent event) {
-        if (!(event.getEntity() instanceof Snowball snowball)) return;
-        if (!snowball.hasMetadata("grapple_range")) return;
-
-        Player player = (Player) snowball.getShooter();
-        if (player == null || !player.isOnline()) return;
-
-        // Visual pull
-        Location hitLoc = event.getHitBlock() != null
-                ? event.getHitBlock().getLocation().add(0.5, 0.5, 0.5)
-                : (event.getHitEntity() != null ? event.getHitEntity().getLocation() : null);
-
-        if (hitLoc != null) {
-            // Apply pull
-            org.bukkit.util.Vector vector = hitLoc.toVector().subtract(player.getLocation().toVector());
-            double distance = vector.length();
-            if (distance > 1) {
-                org.bukkit.util.Vector velocity = vector.normalize().multiply(1.5);
-                velocity.setY(Math.min(0.8, vector.getY() * 0.1 + 0.55));
-                player.setVelocity(velocity);
-                player.playSound(player.getLocation(), Sound.ENTITY_WIND_CHARGE_THROW, 0.8f, 1.3f);
-            }
-        }
-        snowball.remove();
-    }
-
-    @EventHandler
-    public void onPlayerSwapHandItems(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        ItemStack mainHand = event.getMainHandItem();
-        ItemStack offHand = event.getOffHandItem();
-
-        if (mainHand == null || mainHand.getType() != Material.FIREWORK_STAR) return;
-        if (offHand == null || offHand.getType() == Material.AIR) return;
-
-        ItemMeta mainMeta = mainHand.getItemMeta();
-        if (mainMeta == null) return;
-
-        NamespacedKey itemKey = new NamespacedKey(plugin, "item_id");
-        String itemId = mainMeta.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
-        if (itemId == null) return;
-
-        if (itemId.equals("arcane.lifesteal_rune") || itemId.equals("arcane.speed_rune")) {
-            event.setCancelled(true);
-
-            NamespacedKey typeKey = new NamespacedKey(plugin, "rune_type");
-            String runeType = mainMeta.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
-            if (runeType == null) return;
-
-            boolean valid = false;
-            if (runeType.equals("WEAPON_SWORD")) {
-                valid = offHand.getType().name().contains("SWORD");
-            } else if (runeType.equals("ARMOR_BOOTS")) {
-                valid = offHand.getType().name().contains("BOOTS");
-            }
-
-            if (!valid) {
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
-                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("This rune cannot be applied to this item!")));
-                return;
-            }
-
-            ItemMeta offMeta = offHand.getItemMeta();
-            if (offMeta == null) return;
-
-            NamespacedKey effectKey = new NamespacedKey(plugin, "rune_effect");
-            String effect = mainMeta.getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
-            NamespacedKey lvlKey = new NamespacedKey(plugin, "rune_level");
-            Integer lvl = mainMeta.getPersistentDataContainer().get(lvlKey, PersistentDataType.INTEGER);
-            if (effect == null || lvl == null) return;
-
-            NamespacedKey applyKey = new NamespacedKey(plugin, "rune_" + effect);
-            offMeta.getPersistentDataContainer().set(applyKey, PersistentDataType.INTEGER, lvl);
-
-            List<net.kyori.adventure.text.Component> lore = offMeta.lore();
-            if (lore == null) lore = new java.util.ArrayList<>();
-
-            String displayEffectName = effect.equalsIgnoreCase("lifesteal") ? "Lifesteal I" : "Speed I";
-            net.kyori.adventure.text.Component runeLoreComponent = MM.deserialize(C_PURPLE + toSmallCaps(displayEffectName) + " " + C_GRAY + toSmallCaps("(Applied)"));
-
-            boolean found = false;
-            for (int i = 0; i < lore.size(); i++) {
-                String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(lore.get(i));
-                if (plain.contains(toSmallCaps(displayEffectName))) {
-                    lore.set(i, runeLoreComponent);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                lore.add(MM.deserialize(""));
-                lore.add(runeLoreComponent);
-            }
-            offMeta.lore(lore);
-            offHand.setItemMeta(offMeta);
-
-            // Consume 1 rune
-            mainHand.setAmount(mainHand.getAmount() - 1);
-            player.getInventory().setItemInMainHand(mainHand);
-
-            player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1.2f);
-            player.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, player.getLocation(), 30, 0.5, 1, 0.5);
-            player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Successfully applied ") + C_PURPLE + toSmallCaps(displayEffectName) + C_GREEN + toSmallCaps(" to your item!")));
-        }
-    }
-
-    @EventHandler
-    public void onEntityDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player player)) return;
-        if (!(event.getEntity() instanceof LivingEntity target)) return;
-
-        ItemStack sword = player.getInventory().getItemInMainHand();
-        if (sword == null || sword.getType() == Material.AIR) return;
-
-        ItemMeta meta = sword.getItemMeta();
-        if (meta == null) return;
-
-        NamespacedKey applyKey = new NamespacedKey(plugin, "rune_lifesteal");
-        Integer lvl = meta.getPersistentDataContainer().get(applyKey, PersistentDataType.INTEGER);
-        if (lvl == null) return;
-
-        double damage = event.getFinalDamage();
-        double healAmount = damage * 0.15 * lvl;
-
-        double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
-        player.setHealth(Math.min(maxHealth, player.getHealth() + healAmount));
-
-        player.getWorld().spawnParticle(org.bukkit.Particle.HEART, player.getLocation().add(0, 1.2, 0), 4, 0.2, 0.2, 0.2);
-        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.4f, 1.8f);
-    }
-
-    private void updateSpeedRunes(Player player) {
-        ItemStack boots = player.getInventory().getBoots();
-        if (boots != null && boots.getType() != Material.AIR) {
-            ItemMeta meta = boots.getItemMeta();
-            if (meta != null) {
-                NamespacedKey applyKey = new NamespacedKey(plugin, "rune_speed");
-                if (meta.getPersistentDataContainer().has(applyKey, PersistentDataType.INTEGER)) {
-                    player.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                            org.bukkit.potion.PotionEffectType.SPEED,
-                            25,
-                            0,
-                            true,
-                            false,
-                            true
-                    ));
-                }
-            }
-        }
-    }
-
-    private void openWaypointLinkGui(Player player) {
-        PlayerSettings settings = dataManager.get(player.getUniqueId());
-        if (settings == null || settings.waypoints.isEmpty()) {
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
-            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You have no waypoints! Create one first using /wp create <name>")));
-            return;
-        }
-
-        WaypointLinkInventoryHolder linkHolder = new WaypointLinkInventoryHolder();
-        int size = Math.min(54, Math.max(9, ((settings.waypoints.size() - 1) / 9 + 1) * 9));
-        Inventory inv = Bukkit.createInventory(linkHolder, size, MM.deserialize("<dark_gray>» " + G_GOLD + toSmallCaps("Link Waypoint")));
-        linkHolder.setInventory(inv);
-
-        ItemStack glass = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
-        ItemMeta glassMeta = glass.getItemMeta();
-        if (glassMeta != null) {
-            glassMeta.displayName(MM.deserialize(" "));
-            glass.setItemMeta(glassMeta);
-        }
-        for (int i = 0; i < size; i++) {
-            inv.setItem(i, glass);
-        }
-
-        int slot = 0;
-        for (String wpName : settings.waypoints.keySet()) {
-            ItemStack wpItem = new ItemStack(Material.MAP);
-            ItemMeta wpMeta = wpItem.getItemMeta();
-            if (wpMeta != null) {
-                wpMeta.displayName(MM.deserialize(C_ORANGE + toSmallCaps(wpName)));
-                wpMeta.lore(List.of(
-                        MM.deserialize(""),
-                        MM.deserialize(C_GRAY + toSmallCaps("Click to link this waypoint")),
-                        MM.deserialize(C_GRAY + toSmallCaps("to your compass."))
-                ));
-                wpItem.setItemMeta(wpMeta);
-            }
-            inv.setItem(slot, wpItem);
-            linkHolder.getSlotMap().put(slot, wpName);
-            slot++;
-            if (slot >= size) break;
-        }
-
-        player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 1f, 1f);
-        player.openInventory(inv);
-    }
-
-    private void teleportToWaypoint(Player player, String waypointName, ItemStack compass) {
-        PlayerSettings settings = dataManager.get(player.getUniqueId());
-        Location loc = null;
-        if (settings != null) {
-            loc = settings.waypoints.get(waypointName);
-        }
-
-        if (loc == null) {
-            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1f);
-            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Linked waypoint '") + waypointName + toSmallCaps("' no longer exists!")));
-
-            ItemMeta meta = compass.getItemMeta();
-            if (meta != null) {
-                NamespacedKey linkKey = new NamespacedKey(plugin, "linked_waypoint");
-                meta.getPersistentDataContainer().remove(linkKey);
-                meta.displayName(MM.deserialize(G_GOLD + toSmallCaps("Waypoint Compass")));
-                meta.lore(List.of(
-                        MM.deserialize(C_GRAY + toSmallCaps("A celestial compass that aligns with waypoints.")),
-                        MM.deserialize(""),
-                        MM.deserialize(C_YELLOW + toSmallCaps("Right-click to teleport to the linked waypoint.")),
-                        MM.deserialize(C_GRAY + toSmallCaps("Shift-Right-click to link a waypoint."))
-                ));
-                compass.setItemMeta(meta);
-            }
-            return;
-        }
-
-        Location before = player.getLocation();
-        player.teleport(loc);
-
-        before.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, before, 50, 0.5, 1, 0.5);
-        loc.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, loc, 50, 0.5, 1, 0.5);
-
-        before.getWorld().playSound(before, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-        loc.getWorld().playSound(loc, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-
-        player.setCooldown(Material.COMPASS, 200);
-        player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Teleported to waypoint: ") + C_ORANGE + waypointName));
-    }
-
-    @EventHandler
-    public void onPrepareCraft(PrepareItemCraftEvent event) {
-        ItemStack result = event.getInventory().getResult();
-        if (result == null || result.getType() == Material.AIR) return;
-
-        ItemMeta meta = result.getItemMeta();
-        if (meta == null) return;
-
-        NamespacedKey key = new NamespacedKey(plugin, "item_id");
-        String itemId = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-        if (itemId == null) return;
-
-        if (event.getView().getPlayer() instanceof Player player) {
-            // 1. Verify Player Unlocks
-            if (!manager.isUnlocked(player.getUniqueId(), itemId)) {
-                event.getInventory().setResult(new ItemStack(Material.AIR));
-                return;
-            }
-
-            // 2. Verify Placed Machine Structure requirements
-            String structure = activeMachine.getOrDefault(player.getUniqueId(), "none");
-            boolean tableRequired = itemId.equals("arcane.wand_of_embers") || 
-                                    itemId.equals("arcane.lifesteal_rune") || 
-                                    itemId.equals("arcane.speed_rune") || 
-                                    itemId.equals("arcane.speed_boots");
-            boolean forgeRequired = itemId.equals("explorer.waypoint_compass") || 
-                                    itemId.startsWith("explorer.grappling_hook.");
-
-            if (tableRequired && !structure.equals("arcane_table")) {
-                event.getInventory().setResult(new ItemStack(Material.AIR));
-                player.sendActionBar(MM.deserialize(C_RED + toSmallCaps("Requires: Arcana Table")));
-                return;
-            }
-
-            if (forgeRequired && !structure.equals("heavy_forge")) {
-                event.getInventory().setResult(new ItemStack(Material.AIR));
-                player.sendActionBar(MM.deserialize(C_RED + toSmallCaps("Requires: Heavy Forge")));
-                return;
-            }
-
-            // 3. Verify Custom Ingredients (blocking vanilla equivalents)
-            if (itemId.equals("arcane.speed_boots")) {
-                ItemStack[] matrix = event.getInventory().getMatrix();
-                if (!isCustomItem(matrix[0], "arcane.speed_rune") || !isCustomItem(matrix[2], "arcane.speed_rune")) {
-                    event.getInventory().setResult(new ItemStack(Material.AIR));
-                    return;
-                }
-            } else if (itemId.equals("explorer.grappling_hook.diamond")) {
-                ItemStack[] matrix = event.getInventory().getMatrix();
-                // slot 4 is the middle slot in a 3x3 grid
-                if (!isCustomItem(matrix[4], "explorer.grappling_hook.iron")) {
-                    event.getInventory().setResult(new ItemStack(Material.AIR));
-                    return;
-                }
-            } else if (itemId.equals("explorer.grappling_hook.netherite")) {
-                ItemStack[] matrix = event.getInventory().getMatrix();
-                if (!isCustomItem(matrix[4], "explorer.grappling_hook.diamond")) {
-                    event.getInventory().setResult(new ItemStack(Material.AIR));
-                    return;
-                }
-            }
-        }
-    }
-
-    private boolean isCustomItem(ItemStack item, String expectedId) {
-        if (item == null || item.getType() == Material.AIR) return false;
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return false;
-        NamespacedKey key = new NamespacedKey(plugin, "item_id");
-        String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-        return expectedId.equals(id);
     }
 }

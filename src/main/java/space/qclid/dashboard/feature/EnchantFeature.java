@@ -139,7 +139,7 @@ public class EnchantFeature implements Listener {
         }
 
         int size = Math.min(54, Math.max(9, ((possible.size() / 9) + 1) * 9));
-        Inventory inv = Bukkit.createInventory(null, size, MM.deserialize(G_GOLD + toSmallCaps(GUI_ENCHANT)));
+        Inventory inv = Bukkit.createInventory(null, size, parse(G_GOLD + toSmallCaps(GUI_ENCHANT)));
 
         for (Enchantment ench : possible) {
             int currentLevel = held.getType() == Material.ENCHANTED_BOOK
@@ -153,7 +153,7 @@ public class EnchantFeature implements Listener {
             ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
             EnchantmentStorageMeta meta = (EnchantmentStorageMeta) book.getItemMeta();
             meta.addStoredEnchant(ench, nextLevel, true);
-            meta.displayName(MM.deserialize(G_GOLD + toSmallCaps(ench.key().value().replace("_", " ")) + " " + nextLevel));
+            meta.displayName(parse(G_GOLD + toSmallCaps(ench.key().value().replace("_", " ")) + " " + nextLevel));
             meta.lore(List.of(MM.deserialize(C_YELLOW + toSmallCaps("Cost") + ": " + C_ORANGE + cost + " " + toSmallCaps("diamonds"))));
             book.setItemMeta(meta);
             inv.addItem(book);
@@ -178,14 +178,14 @@ public class EnchantFeature implements Listener {
         }
 
         int size = Math.min(54, Math.max(9, ((enchants.size() / 9) + 1) * 9));
-        Inventory inv = Bukkit.createInventory(null, size, MM.deserialize(G_GOLD + toSmallCaps(GUI_DISENCHANT)));
+        Inventory inv = Bukkit.createInventory(null, size, parse(G_GOLD + toSmallCaps(GUI_DISENCHANT)));
 
         for (Map.Entry<Enchantment, Integer> e : enchants.entrySet()) {
             int refund = (e.getKey().getMaxLevel() == 1) ? 3 : e.getValue();
             ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
             EnchantmentStorageMeta meta = (EnchantmentStorageMeta) book.getItemMeta();
             meta.addStoredEnchant(e.getKey(), e.getValue(), true);
-            meta.displayName(MM.deserialize(G_GOLD + toSmallCaps(e.getKey().key().value().replace("_", " ")) + " " + e.getValue()));
+            meta.displayName(parse(G_GOLD + toSmallCaps(e.getKey().key().value().replace("_", " ")) + " " + e.getValue()));
             meta.lore(List.of(MM.deserialize(C_GREEN + toSmallCaps("Refund") + ": " + C_ORANGE + refund + " " + toSmallCaps("diamonds"))));
             book.setItemMeta(meta);
             inv.addItem(book);

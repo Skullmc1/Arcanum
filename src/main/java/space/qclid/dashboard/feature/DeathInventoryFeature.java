@@ -95,7 +95,7 @@ public class DeathInventoryFeature implements Listener {
     // ── GUI ───────────────────────────────────────────────────────────────────
 
     private void openDeathInventory(Player player, ItemStack[] items) {
-        Inventory inv = Bukkit.createInventory(null, 45, MM.deserialize(G_GOLD + toSmallCaps(GUI_TITLE)));
+        Inventory inv = Bukkit.createInventory(null, 45, parse(G_GOLD + toSmallCaps(GUI_TITLE)));
         inv.setContents(items);
         player.openInventory(inv);
     }

@@ -124,12 +124,23 @@ public class CodexGuiListener implements Listener {
         }
 
         // Check items requirements
+        java.util.ArrayList<String> missing = new java.util.ArrayList<>();
         for (ItemStack req : item.getItemRequirements()) {
-            if (!player.getInventory().containsAtLeast(req, req.getAmount())) {
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
-                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You do not meet all requirements!")));
-                return;
+            if (!hasRequirement(player, req)) {
+                String reqName;
+                if (req.getItemMeta() != null && req.getItemMeta().hasDisplayName()) {
+                    reqName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(req.getItemMeta().displayName());
+                } else {
+                    reqName = req.getType().name().replace("_", " ").toLowerCase();
+                }
+                missing.add(req.getAmount() + "x " + toSmallCaps(reqName));
             }
+        }
+
+        if (!missing.isEmpty()) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Missing requirements: ") + String.join(", ", missing)));
+            return;
         }
 
         // Unlock!
@@ -159,7 +170,7 @@ public class CodexGuiListener implements Listener {
         if (meta != null) {
             NamespacedKey key = new NamespacedKey(plugin, "linked_waypoint");
             meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, waypointName);
-            meta.displayName(MM.deserialize(G_GOLD + toSmallCaps("Waypoint Compass") + C_GRAY + " (" + C_ORANGE + waypointName + C_GRAY + ")"));
+            meta.displayName(parse(G_GOLD + toSmallCaps("Waypoint Compass") + C_GRAY + " (" + C_ORANGE + waypointName + C_GRAY + ")"));
             meta.lore(List.of(
                     MM.deserialize(C_GRAY + toSmallCaps("Linked to: ") + C_ORANGE + waypointName),
                     MM.deserialize(""),
@@ -172,5 +183,34 @@ public class CodexGuiListener implements Listener {
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1f, 1.2f);
         player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Compass linked to waypoint: ") + C_ORANGE + waypointName));
         player.closeInventory();
+    }
+
+    private boolean hasRequirement(Player player, ItemStack req) {
+        if (req == null) return true;
+        ItemMeta reqMeta = req.getItemMeta();
+        String reqId = null;
+        if (reqMeta != null) {
+            NamespacedKey key = new NamespacedKey(plugin, "item_id");
+            reqId = reqMeta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+        }
+
+        if (reqId == null) {
+            return player.getInventory().containsAtLeast(req, req.getAmount());
+        }
+
+        int found = 0;
+        NamespacedKey key = new NamespacedKey(plugin, "item_id");
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == req.getType()) {
+                ItemMeta meta = item.getItemMeta();
+                if (meta != null) {
+                    String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+                    if (reqId.equals(id)) {
+                        found += item.getAmount();
+                    }
+                }
+            }
+        }
+        return found >= req.getAmount();
     }
 }
