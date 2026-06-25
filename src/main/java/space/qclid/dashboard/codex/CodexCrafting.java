@@ -14,6 +14,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static space.qclid.dashboard.util.TextUtil.*;
 
 public class CodexCrafting {
@@ -73,6 +76,20 @@ public class CodexCrafting {
         Inventory inv = dropper.getInventory();
         ItemStack[] contents = inv.getContents();
 
+        boolean empty = true;
+        for (ItemStack item : contents) {
+            if (item != null && item.getType() != Material.AIR) {
+                empty = false;
+                break;
+            }
+        }
+
+        if (empty) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1.0f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The dropper is empty!")));
+            return;
+        }
+
         if (structureType.equals("upgrade_table")) {
             ItemStack combinedResult = tryCombineRunes(contents);
             if (combinedResult != null) {
@@ -86,8 +103,9 @@ public class CodexCrafting {
                     return;
                 }
 
-                inv.setItem(1, null);
-                inv.setItem(4, null);
+                for (int i = 0; i < 9; i++) {
+                    inv.setItem(i, null);
+                }
 
                 dropLoc.getWorld().dropItemNaturally(dropLoc, combinedResult);
                 dropLoc.getWorld().playSound(dropLoc, Sound.BLOCK_ANVIL_USE, 1f, 1.2f);
@@ -133,6 +151,10 @@ public class CodexCrafting {
                 }
             }
         }
+
+        // No recipe matched
+        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1.0f);
+        player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Invalid recipe! Check the Codex for correct layouts.")));
     }
 
     private boolean recipeMatches(ItemStack[] dropperContents, CodexItem codexItem) {
@@ -211,51 +233,62 @@ public class CodexCrafting {
     }
 
     private ItemStack tryCombineRunes(ItemStack[] contents) {
-        ItemStack slot4 = contents[4];
-        ItemStack slot1 = contents[1];
-        if (slot4 == null || slot4.getType() == Material.AIR) return null;
-        if (slot1 == null || slot1.getType() == Material.AIR) return null;
-
+        List<ItemStack> runeStacks = new ArrayList<>();
         for (int i = 0; i < 9; i++) {
-            if (i == 4 || i == 1) continue;
-            if (contents[i] != null && contents[i].getType() != Material.AIR) {
-                return null;
+            ItemStack item = contents[i];
+            if (item != null && item.getType() != Material.AIR) {
+                runeStacks.add(item);
             }
         }
 
-        ItemMeta meta4 = slot4.getItemMeta();
-        ItemMeta meta1 = slot1.getItemMeta();
-        if (meta4 == null || meta1 == null) return null;
+        int totalAmount = 0;
+        for (ItemStack stack : runeStacks) {
+            totalAmount += stack.getAmount();
+        }
+        if (totalAmount != 2) return null;
+
+        ItemStack firstStack = runeStacks.get(0);
+        if (firstStack.getType() != Material.FIREWORK_STAR) return null;
+
+        ItemMeta firstMeta = firstStack.getItemMeta();
+        if (firstMeta == null) return null;
 
         NamespacedKey effectKey = new NamespacedKey(plugin, "rune_effect");
         NamespacedKey lvlKey = new NamespacedKey(plugin, "rune_level");
         NamespacedKey itemKey = new NamespacedKey(plugin, "item_id");
 
-        String effect4 = meta4.getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
-        String effect1 = meta1.getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+        String effect = firstMeta.getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+        Integer lvl = firstMeta.getPersistentDataContainer().get(lvlKey, PersistentDataType.INTEGER);
+        String id = firstMeta.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
 
-        Integer lvl4 = meta4.getPersistentDataContainer().get(lvlKey, PersistentDataType.INTEGER);
-        Integer lvl1 = meta1.getPersistentDataContainer().get(lvlKey, PersistentDataType.INTEGER);
+        if (effect == null || lvl == null || id == null) return null;
 
-        String id4 = meta4.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
-        String id1 = meta1.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
+        if (runeStacks.size() == 2) {
+            ItemStack secondStack = runeStacks.get(1);
+            if (secondStack.getType() != Material.FIREWORK_STAR) return null;
 
-        if (effect4 == null || effect1 == null || lvl4 == null || lvl1 == null || id4 == null || id1 == null) return null;
+            ItemMeta secondMeta = secondStack.getItemMeta();
+            if (secondMeta == null) return null;
 
-        if (effect4.equals(effect1) && lvl4.equals(lvl1)) {
-            if (slot4.getAmount() != 1 || slot1.getAmount() != 1) return null;
+            String effect2 = secondMeta.getPersistentDataContainer().get(effectKey, PersistentDataType.STRING);
+            Integer lvl2 = secondMeta.getPersistentDataContainer().get(lvlKey, PersistentDataType.INTEGER);
+            String id2 = secondMeta.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
 
-            int nextLevel = lvl4 + 1;
-            if (nextLevel > 3) return null;
+            if (effect2 == null || lvl2 == null || id2 == null) return null;
 
-            String baseId = id4;
-            if (baseId.endsWith("_2")) baseId = baseId.substring(0, baseId.length() - 2);
-            else if (baseId.endsWith("_3")) baseId = baseId.substring(0, baseId.length() - 2);
-
-            return arcaneItems.createEnchantmentRune(baseId, effect4, nextLevel);
+            if (!effect.equals(effect2) || !lvl.equals(lvl2) || !id.equals(id2)) {
+                return null;
+            }
         }
 
-        return null;
+        int nextLevel = lvl + 1;
+        if (nextLevel > 3) return null;
+
+        String baseId = id;
+        if (baseId.endsWith("_2")) baseId = baseId.substring(0, baseId.length() - 2);
+        else if (baseId.endsWith("_3")) baseId = baseId.substring(0, baseId.length() - 2);
+
+        return arcaneItems.createEnchantmentRune(baseId, effect, nextLevel);
     }
 
     private String getStationType(ItemStack station) {
