@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.listeners;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -24,6 +24,13 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import space.qclid.dashboard.data.DataManager;
 
+import space.qclid.dashboard.codex.core.*;
+import space.qclid.dashboard.codex.items.*;
+import space.qclid.dashboard.codex.crafting.*;
+import space.qclid.dashboard.codex.tasks.*;
+import space.qclid.dashboard.codex.gui.*;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -78,6 +85,33 @@ public class CodexPlayerListener implements Listener {
         if (codexPassiveTask.activeSmelters.containsKey(player.getUniqueId()) && event.getInventory().equals(codexPassiveTask.activeSmelters.get(player.getUniqueId()))) {
             returnFurnaceItems(player, codexPassiveTask.activeSmelters.remove(player.getUniqueId()));
         }
+
+        // Refresh all items upon inventory close
+        refreshItemLore(player.getItemOnCursor(), plugin);
+        for (ItemStack item : event.getInventory().getContents()) {
+            refreshItemLore(item, plugin);
+        }
+        for (ItemStack item : player.getInventory().getContents()) {
+            refreshItemLore(item, plugin);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        
+        refreshItemLore(event.getCurrentItem(), plugin);
+        refreshItemLore(event.getCursor(), plugin);
+        
+        plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, task -> {
+            if (player.isOnline()) {
+                refreshItemLore(player.getItemOnCursor(), plugin);
+                refreshItemLore(event.getCurrentItem(), plugin);
+                if (event.getClickedInventory() != null && event.getSlot() >= 0 && event.getSlot() < event.getClickedInventory().getSize()) {
+                    refreshItemLore(event.getClickedInventory().getItem(event.getSlot()), plugin);
+                }
+            }
+        }, 1L);
     }
 
     private void returnFurnaceItems(Player player, Inventory inv) {
@@ -94,6 +128,7 @@ public class CodexPlayerListener implements Listener {
     }
 
     @EventHandler
+    @SuppressWarnings("removal")
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         ItemStack main = player.getInventory().getItemInMainHand();
@@ -157,6 +192,76 @@ public class CodexPlayerListener implements Listener {
                                 player.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, player.getLocation().add(0, 1, 0), 2, 0.2, 0.4, 0.2, 0.0);
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Hallowed Ground
+        if (boots != null && boots.getType() != Material.AIR) {
+            ItemMeta bMeta = boots.getItemMeta();
+            if (bMeta != null) {
+                NamespacedKey hgKey = new NamespacedKey(plugin, "rune_hallowed_ground");
+                if (bMeta.getPersistentDataContainer().has(hgKey, PersistentDataType.INTEGER)) {
+                    if (Bukkit.getCurrentTick() % 10 == 0) {
+                        player.getWorld().spawnParticle(org.bukkit.Particle.SOUL_FIRE_FLAME, player.getLocation(), 3, 0.2, 0.1, 0.2, 0.01);
+                        
+                        // Cure player wither/poison
+                        if (player.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON)) player.removePotionEffect(org.bukkit.potion.PotionEffectType.POISON);
+                        if (player.hasPotionEffect(org.bukkit.potion.PotionEffectType.WITHER)) player.removePotionEffect(org.bukkit.potion.PotionEffectType.WITHER);
+                        
+                        // Damage Undead
+                        for (org.bukkit.entity.Entity entity : player.getNearbyEntities(1.5, 1.0, 1.5)) {
+                            if (entity instanceof LivingEntity le && le.getCategory() == org.bukkit.entity.EntityCategory.UNDEAD) {
+                                le.damage(2.0, player);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ashen Veil
+        ItemStack legs = player.getInventory().getLeggings();
+        if (legs != null && legs.getType() != Material.AIR) {
+            ItemMeta lMeta = legs.getItemMeta();
+            if (lMeta != null) {
+                NamespacedKey avKey = new NamespacedKey(plugin, "rune_ashen_veil");
+                if (lMeta.getPersistentDataContainer().has(avKey, PersistentDataType.INTEGER)) {
+                    if (player.isSneaking() && Bukkit.getCurrentTick() % 10 == 0) {
+                        player.getWorld().spawnParticle(org.bukkit.Particle.CAMPFIRE_COSY_SMOKE, player.getLocation(), 10, 0.5, 0.2, 0.5, 0.01);
+                        
+                        for (org.bukkit.entity.Entity entity : player.getNearbyEntities(2.0, 1.0, 2.0)) {
+                            if (entity instanceof LivingEntity le && !le.equals(player)) {
+                                le.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS, 60, 0));
+                                le.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.WITHER, 60, 0));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Mach Rush
+        if (boots != null && boots.getType() != Material.AIR) {
+            ItemMeta bMeta = boots.getItemMeta();
+            if (bMeta != null) {
+                NamespacedKey mrKey = new NamespacedKey(plugin, "rune_mach_rush");
+                if (bMeta.getPersistentDataContainer().has(mrKey, PersistentDataType.INTEGER)) {
+                    if (player.isSprinting() && player.getVelocity().lengthSquared() > 0.001) {
+                        int ticks = player.hasMetadata("mach_rush_ticks") 
+                                    ? player.getMetadata("mach_rush_ticks").get(0).asInt() : 0;
+                        ticks++;
+                        player.setMetadata("mach_rush_ticks", new FixedMetadataValue(plugin, ticks));
+                        
+                        int speedLvl = Math.min(3, ticks / 40); // Max Speed IV (amplifier 3)
+                        player.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, speedLvl, true, false, true));
+                        
+                        if (ticks % 20 == 0) {
+                            player.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, player.getLocation(), 5, 0.3, 0.1, 0.3, 0.05);
+                        }
+                    } else {
+                        player.removeMetadata("mach_rush_ticks", plugin);
                     }
                 }
             }
@@ -282,5 +387,120 @@ public class CodexPlayerListener implements Listener {
                 }
             }
         }
+    }
+
+    @EventHandler
+    public void onPlayerToggleSneak(org.bukkit.event.player.PlayerToggleSneakEvent event) {
+        Player player = event.getPlayer();
+        if (event.isSneaking()) {
+            // 1. Resonance Ping
+            ItemStack hand = player.getInventory().getItemInMainHand();
+            if (hand != null && hand.getType() != Material.AIR) {
+                ItemMeta meta = hand.getItemMeta();
+                if (meta != null) {
+                    NamespacedKey key = new NamespacedKey(plugin, "rune_resonance_ping");
+                    if (meta.getPersistentDataContainer().has(key, PersistentDataType.INTEGER)) {
+                        if (player.hasCooldown(hand.getType())) return;
+                        player.setCooldown(hand.getType(), 100); // 5s cooldown
+                        
+                        player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.6f, 1.2f);
+                        Location center = player.getLocation();
+                        List<org.bukkit.block.Block> ores = new ArrayList<>();
+                        int radius = 10;
+                        for (int x = -radius; x <= radius; x++) {
+                            for (int y = -radius; y <= radius; y++) {
+                                for (int z = -radius; z <= radius; z++) {
+                                    org.bukkit.block.Block b = center.clone().add(x, y, z).getBlock();
+                                    Material type = b.getType();
+                                    if (type == Material.DIAMOND_ORE || type == Material.DEEPSLATE_DIAMOND_ORE ||
+                                        type == Material.GOLD_ORE || type == Material.DEEPSLATE_GOLD_ORE ||
+                                        type == Material.IRON_ORE || type == Material.DEEPSLATE_IRON_ORE ||
+                                        type == Material.EMERALD_ORE || type == Material.DEEPSLATE_EMERALD_ORE ||
+                                        type == Material.ANCIENT_DEBRIS) {
+                                        ores.add(b);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        int[] count = new int[]{0};
+                        plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, t -> {
+                            if (count[0] >= 4 || !player.isOnline()) {
+                                t.cancel();
+                                return;
+                            }
+                            for (org.bukkit.block.Block b : ores) {
+                                Location blockLoc = b.getLocation().add(0.5, 0.5, 0.5);
+                                b.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, blockLoc, 2, 0.2, 0.2, 0.2, 0.0);
+                            }
+                            count[0]++;
+                        }, 1L, 10L);
+                    }
+                }
+            }
+
+            // 2. Rift Walk
+            ItemStack legs = player.getInventory().getLeggings();
+            if (legs != null && legs.getType() != Material.AIR) {
+                ItemMeta meta = legs.getItemMeta();
+                if (meta != null) {
+                    NamespacedKey key = new NamespacedKey(plugin, "rune_rift_walk");
+                    if (meta.getPersistentDataContainer().has(key, PersistentDataType.INTEGER)) {
+                        long lastSneak = player.hasMetadata("last_sneak_time") 
+                                         ? player.getMetadata("last_sneak_time").get(0).asLong() : 0L;
+                        long now = System.currentTimeMillis();
+                        player.setMetadata("last_sneak_time", new FixedMetadataValue(plugin, now));
+                        
+                        if (now - lastSneak > 400 && now - lastSneak < 5000) {
+                            player.sendMessage(MM.deserialize(C_GRAY + toSmallCaps("Sneak again quickly to activate Rift Walk.")));
+                        }
+                        
+                        if (now - lastSneak < 400) {
+                            if (player.hasCooldown(Material.DIAMOND_LEGGINGS)) {
+                                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Rift Walk is on cooldown!")));
+                                return;
+                            }
+                            player.setCooldown(Material.DIAMOND_LEGGINGS, 300); // 15s cooldown
+                            
+                            player.setMetadata("rift_walk_active", new FixedMetadataValue(plugin, true));
+                            player.setCollidable(false);
+                            player.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY, 100, 0));
+                            player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.5f);
+                            player.sendMessage(MM.deserialize(C_PURPLE + toSmallCaps("Shifted into the Rift! Immune to damage.")));
+                            
+                            plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
+                                if (player.isOnline()) {
+                                    player.removeMetadata("rift_walk_active", plugin);
+                                    player.setCollidable(true);
+                                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY);
+                                    player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                                    player.sendMessage(MM.deserialize(C_PURPLE + toSmallCaps("Rift Walk ended.")));
+                                }
+                            }, 100L);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerAnimation(org.bukkit.event.player.PlayerAnimationEvent event) {
+        Player player = event.getPlayer();
+        if (event.getAnimationType() == org.bukkit.event.player.PlayerAnimationType.ARM_SWING) {
+            player.removeMetadata("mach_rush_ticks", plugin);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        for (ItemStack item : player.getInventory().getContents()) {
+            refreshItemLore(item, plugin);
+        }
+        for (ItemStack armor : player.getInventory().getArmorContents()) {
+            refreshItemLore(armor, plugin);
+        }
+        refreshItemLore(player.getInventory().getItemInOffHand(), plugin);
     }
 }

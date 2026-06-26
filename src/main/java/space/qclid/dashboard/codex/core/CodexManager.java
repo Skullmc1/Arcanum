@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.core;
 
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;

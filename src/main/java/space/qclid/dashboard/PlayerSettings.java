@@ -17,6 +17,7 @@ public class PlayerSettings {
     public UUID trackingPlayer = null;
     public Location linkedChest = null;
     public ItemStack[] deathItems = null;
+    public Location deathChest = null;
 
     public void toggleGlobal()     { globalEnabled    = !globalEnabled; }
     public void toggleXyz()        { showXyz          = !showXyz; }

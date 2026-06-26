@@ -7,9 +7,9 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import net.kyori.adventure.text.Component;
-import space.qclid.dashboard.codex.CodexInventoryHolder;
-import space.qclid.dashboard.codex.CodexItem;
-import space.qclid.dashboard.codex.CodexRegistry;
+import space.qclid.dashboard.codex.core.CodexInventoryHolder;
+import space.qclid.dashboard.codex.core.CodexItem;
+import space.qclid.dashboard.codex.core.CodexRegistry;
 
 import java.util.ArrayList;
 import java.util.List;

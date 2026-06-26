@@ -1,5 +1,6 @@
 package space.qclid.dashboard.codex.gui;
 
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -10,7 +11,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import space.qclid.dashboard.codex.*;
+import space.qclid.dashboard.codex.core.CodexCategory;
+import space.qclid.dashboard.codex.core.CodexItem;
+import space.qclid.dashboard.codex.core.CodexManager;
+import space.qclid.dashboard.codex.core.CodexRegistry;
+import space.qclid.dashboard.codex.core.CodexInventoryHolder;
 
 import java.util.List;
 
@@ -39,7 +44,7 @@ public class CodexGuiListener implements Listener {
             if (event.getClickedInventory() != event.getView().getTopInventory()) return;
 
             int slot = event.getSlot();
-            handleCodexClick(player, holder, slot);
+            handleCodexClick(player, holder, slot, event);
             return;
         }
 
@@ -53,7 +58,7 @@ public class CodexGuiListener implements Listener {
         }
     }
 
-    private void handleCodexClick(Player player, CodexInventoryHolder holder, int slot) {
+    private void handleCodexClick(Player player, CodexInventoryHolder holder, int slot, InventoryClickEvent event) {
         switch (holder.getType()) {
             case MAIN -> {
                 String parentCategoryId = holder.getSlotMap().get(slot);
@@ -63,7 +68,8 @@ public class CodexGuiListener implements Listener {
                 }
             }
             case SUB_CATEGORY -> {
-                if (slot == 22) { // Back button in sub-categories
+                ItemStack clicked = event.getCurrentItem();
+                if (clicked != null && clicked.getType() == Material.ARROW) {
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
                     CodexMainGui.open(player, registry);
                     return;

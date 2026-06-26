@@ -60,6 +60,7 @@ public class DataManager {
             config.set(uuid + ".globalEnabled",  s.globalEnabled);
 
             if (s.linkedChest != null) config.set(uuid + ".linkedChest", s.linkedChest);
+            if (s.deathChest  != null) config.set(uuid + ".deathChest",  s.deathChest);
             if (s.deathItems  != null) config.set(uuid + ".deathItems",  Arrays.asList(s.deathItems));
 
             if (!s.waypoints.isEmpty()) {
@@ -107,6 +108,7 @@ public class DataManager {
                 s.showNetherXyz = config.getBoolean(uuidStr + ".showNetherXyz",  true);
                 s.globalEnabled = config.getBoolean(uuidStr + ".globalEnabled",  true);
                 s.linkedChest   = config.getLocation(uuidStr + ".linkedChest");
+                s.deathChest    = config.getLocation(uuidStr + ".deathChest");
 
                 List<?> deathItemsList = config.getList(uuidStr + ".deathItems");
                 if (deathItemsList != null) {

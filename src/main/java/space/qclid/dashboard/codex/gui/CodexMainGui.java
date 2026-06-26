@@ -6,8 +6,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import space.qclid.dashboard.codex.CodexInventoryHolder;
-import space.qclid.dashboard.codex.CodexRegistry;
+import space.qclid.dashboard.codex.core.CodexInventoryHolder;
+import space.qclid.dashboard.codex.core.CodexRegistry;
 
 import java.util.List;
 

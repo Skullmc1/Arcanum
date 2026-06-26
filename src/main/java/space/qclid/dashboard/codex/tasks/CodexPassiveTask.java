@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.tasks;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -11,7 +11,9 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -21,7 +23,10 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.block.BlockFace;
 
+import space.qclid.dashboard.codex.items.ArcaneItems;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -54,8 +59,11 @@ public class CodexPassiveTask {
             updateMagneticRing(player);
             updateJetpack(player);
             updateDemoniumRunes(player);
+            updateGloomAura(player);
             updatePhotosynthesis(player);
             updateVoidWalker(player);
+            updateArmorSets(player);
+            refreshPlayerEquipmentLore(player);
         }
         tickCatchFlameSpread();
         updateSunExposureItems();
@@ -129,10 +137,10 @@ public class CodexPassiveTask {
 
             if (highestBoost > 0) {
                 AttributeModifier mod = new AttributeModifier(
-                        UUID.nameUUIDFromBytes("vitality_geode".getBytes()),
-                        "vitality_geode",
+                        new NamespacedKey("codex", "vitality_geode"),
                         highestBoost,
-                        AttributeModifier.Operation.ADD_NUMBER
+                        AttributeModifier.Operation.ADD_NUMBER,
+                        EquipmentSlotGroup.ANY
                 );
                 attr.addModifier(mod);
             }
@@ -186,7 +194,12 @@ public class CodexPassiveTask {
         for (World world : Bukkit.getWorlds()) {
             for (Entity entity : world.getEntities()) {
                 if (!(entity instanceof LivingEntity source)) continue;
-                if (source.getFireTicks() <= 0) continue;
+                if (source.getFireTicks() <= 0) {
+                    if (source.hasMetadata("catch_flame_level")) {
+                        source.removeMetadata("catch_flame_level", plugin);
+                    }
+                    continue;
+                }
                 if (!source.hasMetadata("catch_flame_level")) continue;
 
                 int level = source.getMetadata("catch_flame_level").get(0).asInt();
@@ -436,6 +449,24 @@ public class CodexPassiveTask {
                     }
                     target.setFireTicks(duration);
                     target.getWorld().spawnParticle(org.bukkit.Particle.FLAME, target.getLocation().add(0, 0.5, 0), 2, 0.1, 0.2, 0.1, 0.01);
+                }
+            }
+        }
+    }
+
+    private void updateGloomAura(Player player) {
+        ItemStack chestplate = player.getInventory().getChestplate();
+        if (chestplate == null || chestplate.getType() == Material.AIR) return;
+        ItemMeta meta = chestplate.getItemMeta();
+        if (meta == null) return;
+        NamespacedKey glKey = new NamespacedKey(plugin, "rune_gloom");
+        if (!meta.getPersistentDataContainer().has(glKey, PersistentDataType.INTEGER)) return;
+        int radius = 5;
+        for (Entity entity : player.getNearbyEntities(radius, radius, radius)) {
+            if (entity instanceof Monster monster && !monster.isDead()) {
+                monster.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 1, true, false, true));
+                if (Math.random() < 0.05) {
+                    player.getWorld().spawnParticle(org.bukkit.Particle.SMOKE, monster.getLocation().add(0, 1, 0), 1, 0.1, 0.2, 0.1, 0.01);
                 }
             }
         }
@@ -761,6 +792,134 @@ public class CodexPassiveTask {
                 player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.0f);
                 player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Void Walker saved you from the void!")));
             }
+        }
+    }
+
+    private void updateArmorSets(Player player) {
+        if (isWearingFullSet(player, "webbed")) {
+            if (isNextToWall(player)) {
+                org.bukkit.util.Vector vel = player.getVelocity();
+                if (player.isSneaking()) {
+                    player.setVelocity(new org.bukkit.util.Vector(vel.getX(), 0.0, vel.getZ()));
+                } else if (vel.getY() > -0.1) {
+                    player.setVelocity(new org.bukkit.util.Vector(vel.getX(), 0.18, vel.getZ()));
+                }
+            }
+        }
+
+        if (isWearingFullSet(player, "aegis_vanguard")) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 25, 0, true, false, true));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 25, 1, true, false, true));
+
+            if (Bukkit.getCurrentTick() % 200 == 0) {
+                Location loc = player.getLocation();
+                player.getWorld().spawnParticle(org.bukkit.Particle.CRIT, loc.clone().add(0, 1, 0), 20, 1.0, 0.5, 1.0, 0.1);
+                player.getWorld().playSound(loc, Sound.ENTITY_WARDEN_ROAR, 0.5f, 1.5f);
+                for (org.bukkit.entity.Entity entity : player.getNearbyEntities(8.0, 8.0, 8.0)) {
+                    if (entity instanceof org.bukkit.entity.Monster monster) {
+                        monster.setTarget(player);
+                    }
+                }
+                player.sendMessage(MM.deserialize(C_GOLD + toSmallCaps("Aegis Vanguard pulse: Mobs taunted!")));
+            }
+        }
+
+        if (isWearingFullSet(player, "storm_weaver")) {
+            if (player.getVelocity().lengthSquared() > 0.001) {
+                if (Bukkit.getCurrentTick() % 100 == 0) {
+                    regenerateMagicalCharges(player);
+                }
+            }
+        }
+    }
+
+    public boolean isWearingFullSet(Player player, String setName) {
+        ItemStack helmet = player.getInventory().getHelmet();
+        ItemStack chest = player.getInventory().getChestplate();
+        ItemStack legs = player.getInventory().getLeggings();
+        ItemStack boots = player.getInventory().getBoots();
+
+        return isSetPiece(helmet, setName, "helmet") &&
+               isSetPiece(chest, setName, "chestplate") &&
+               isSetPiece(legs, setName, "leggings") &&
+               isSetPiece(boots, setName, "boots");
+    }
+
+    private boolean isSetPiece(ItemStack item, String setName, String piece) {
+        if (item == null || item.getType() == Material.AIR) return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return false;
+        NamespacedKey key = new NamespacedKey(plugin, "item_id");
+        String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+        if (id == null) return false;
+        return id.contains(".armor." + setName + "." + piece);
+    }
+
+    private boolean isNextToWall(Player player) {
+        Location loc = player.getLocation();
+        BlockFace[] faces = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+        for (BlockFace face : faces) {
+            if (loc.getBlock().getRelative(face).getType().isSolid()) return true;
+            if (loc.clone().add(0, 0.5, 0).getBlock().getRelative(face).getType().isSolid()) return true;
+        }
+        return false;
+    }
+
+    private void regenerateMagicalCharges(Player player) {
+        boolean charged = false;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() == Material.AIR) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta == null) continue;
+
+            NamespacedKey key = new NamespacedKey(plugin, "item_id");
+            String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+            if (id == null) continue;
+
+            NamespacedKey chargeKey = new NamespacedKey(plugin, "charges");
+            if (id.equals("explorer.gadgets.thermal_canteen")) {
+                int charges = meta.getPersistentDataContainer().getOrDefault(chargeKey, PersistentDataType.INTEGER, 4);
+                if (charges < 4) {
+                    charges++;
+                    meta.getPersistentDataContainer().set(chargeKey, PersistentDataType.INTEGER, charges);
+                    meta.lore(List.of(
+                            MM.deserialize(C_GRAY + toSmallCaps("Flask cures effects and restores hunger.")),
+                            MM.deserialize(""),
+                            MM.deserialize(C_YELLOW + toSmallCaps("Charges") + ": " + C_ORANGE + charges + " / 4")
+                    ));
+                    item.setItemMeta(meta);
+                    charged = true;
+                }
+            } else if (id.startsWith("explorer.tools.locator.")) {
+                int charges = meta.getPersistentDataContainer().getOrDefault(chargeKey, PersistentDataType.INTEGER, 10);
+                if (charges < 10) {
+                    charges++;
+                    meta.getPersistentDataContainer().set(chargeKey, PersistentDataType.INTEGER, charges);
+                    String struct = id.substring(id.lastIndexOf('.') + 1);
+                    String structName = Character.toUpperCase(struct.charAt(0)) + struct.substring(1).replace("_", " ");
+                    meta.lore(List.of(
+                            MM.deserialize(C_GRAY + toSmallCaps("Locates the nearest " + structName + ".")),
+                            MM.deserialize(""),
+                            MM.deserialize(C_YELLOW + toSmallCaps("Charges") + ": " + C_ORANGE + charges + " / 10")
+                    ));
+                    item.setItemMeta(meta);
+                    charged = true;
+                }
+            }
+        }
+        if (charged) {
+            player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.3f, 1.5f);
+            player.sendActionBar(MM.deserialize(C_PURPLE + toSmallCaps("Storm-Weaver: Regenerated magical charges!")));
+        }
+    }
+
+    private void refreshPlayerEquipmentLore(Player player) {
+        ItemStack main = player.getInventory().getItemInMainHand();
+        refreshItemLore(main, plugin);
+        ItemStack off = player.getInventory().getItemInOffHand();
+        refreshItemLore(off, plugin);
+        for (ItemStack armor : player.getInventory().getArmorContents()) {
+            refreshItemLore(armor, plugin);
         }
     }
 }

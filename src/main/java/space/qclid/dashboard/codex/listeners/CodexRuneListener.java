@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.listeners;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -14,6 +14,12 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import space.qclid.dashboard.data.DataManager;
+
+import space.qclid.dashboard.codex.core.*;
+import space.qclid.dashboard.codex.items.*;
+import space.qclid.dashboard.codex.crafting.*;
+import space.qclid.dashboard.codex.tasks.*;
+import space.qclid.dashboard.codex.gui.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +60,9 @@ public class CodexRuneListener implements Listener {
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         ItemStack offHand = player.getInventory().getItemInOffHand();
 
-        if (mainHand == null || mainHand.getType() != Material.FIREWORK_STAR) return;
+        if (mainHand == null) return;
+        Material mainType = mainHand.getType();
+        if (mainType != Material.PRIZE_POTTERY_SHERD && mainType != Material.GUSTER_BANNER_PATTERN && mainType != Material.PRISMARINE_SHARD) return;
         if (offHand == null || offHand.getType() == Material.AIR) return;
 
         ItemMeta mainMeta = mainHand.getItemMeta();
@@ -164,33 +172,8 @@ public class CodexRuneListener implements Listener {
             }
         }
 
-        List<net.kyori.adventure.text.Component> lore = offMeta.lore();
-        if (lore == null) lore = new ArrayList<>();
-
-        String roman = targetLvl == 1 ? "I" : (targetLvl == 2 ? "II" : "III");
-        String nameBase = "";
-        if (effect.equalsIgnoreCase("lifesteal")) nameBase = "Vampiric Bleed";
-        else if (effect.equalsIgnoreCase("speed")) nameBase = "Speed";
-        else if (effect.equalsIgnoreCase("catch_flame")) nameBase = "Catch Flame";
-
-        String displayEffectName = nameBase + " " + roman;
-        net.kyori.adventure.text.Component runeLoreComponent = MM.deserialize(C_PURPLE + toSmallCaps(displayEffectName) + " " + C_GRAY + toSmallCaps("(Applied)"));
-
-        boolean found = false;
-        for (int i = 0; i < lore.size(); i++) {
-            String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(lore.get(i));
-            if (plain.contains(toSmallCaps(nameBase))) {
-                lore.set(i, runeLoreComponent);
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            lore.add(MM.deserialize(""));
-            lore.add(runeLoreComponent);
-        }
-        offMeta.lore(lore);
         offHand.setItemMeta(offMeta);
+        space.qclid.dashboard.util.TextUtil.refreshItemLore(offHand, plugin);
 
         // Consume 1 rune safely
         if (mainHand.getAmount() <= 1) {
@@ -201,9 +184,13 @@ public class CodexRuneListener implements Listener {
         }
         player.getInventory().setItemInOffHand(offHand);
 
+        String roman = getRomanNum(targetLvl);
+        String nameBase = getEffectDisplayName(effect);
+        String displayEffectName = nameBase + " " + roman;
+
         player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1.2f);
         player.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, player.getLocation(), 30, 0.5, 1, 0.5);
-        player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Successfully applied ") + C_PURPLE + toSmallCaps(displayEffectName) + C_GREEN + toSmallCaps(" to your item!")));
+        player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Successfully applied ") + C_GRAY + toSmallCaps(displayEffectName) + C_GREEN + toSmallCaps(" to your item!")));
     }
 
     @EventHandler

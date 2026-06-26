@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.crafting;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -13,6 +13,9 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import space.qclid.dashboard.codex.core.*;
+import space.qclid.dashboard.codex.items.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +38,29 @@ public class CodexCrafting {
 
     public boolean isAnvil(Material material) {
         return material == Material.ANVIL || material == Material.CHIPPED_ANVIL || material == Material.DAMAGED_ANVIL;
+    }
+
+    public boolean isValidEnchanter(Block clickedBlock) {
+        if (clickedBlock.getType() != Material.ENCHANTING_TABLE) return false;
+        Block below = clickedBlock.getRelative(BlockFace.DOWN);
+        return check3x3Base(below, Material.DIAMOND_BLOCK);
+    }
+
+    public boolean isValidDisenchanter(Block clickedBlock) {
+        if (clickedBlock.getType() != Material.ENCHANTING_TABLE) return false;
+        Block below = clickedBlock.getRelative(BlockFace.DOWN);
+        return check3x3Base(below, Material.IRON_BLOCK);
+    }
+
+    private boolean check3x3Base(Block centerBlock, Material material) {
+        for (int x = -1; x <= 1; x++) {
+            for (int z = -1; z <= 1; z++) {
+                if (centerBlock.getRelative(x, 0, z).getType() != material) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     public Dropper getDropperForStructure(Block clickedBlock, String structureType) {
@@ -66,6 +92,34 @@ public class CodexCrafting {
                 Block belowDropper = below.getRelative(BlockFace.DOWN);
                 if (belowDropper.getType() == Material.BOOKSHELF) {
                     return dropper;
+                }
+            }
+        } else if (structureType.equals("blessings_altar")) {
+            Block below = clickedBlock.getRelative(BlockFace.DOWN);
+            if (below.getType() == Material.DROPPER && below.getState() instanceof Dropper dropper) {
+                BlockFace centerDir = findBlessingsAltarGoldCenter(below);
+                if (centerDir != null) {
+                    return dropper;
+                }
+            }
+        } else if (structureType.equals("heavy_alloy_forge")) {
+            if (clickedBlock.getType() == Material.BLAST_FURNACE) {
+                Block below = clickedBlock.getRelative(BlockFace.DOWN);
+                if (below.getType() == Material.DROPPER && below.getState() instanceof Dropper dropper) {
+                    Block belowDropper = below.getRelative(BlockFace.DOWN);
+                    boolean magmaValid = true;
+                    for (int x = -1; x <= 1; x++) {
+                        for (int z = -1; z <= 1; z++) {
+                            if (belowDropper.getRelative(x, 0, z).getType() != Material.MAGMA_BLOCK) {
+                                magmaValid = false;
+                                break;
+                            }
+                        }
+                        if (!magmaValid) break;
+                    }
+                    if (magmaValid) {
+                        return dropper;
+                    }
                 }
             }
         }
@@ -248,7 +302,8 @@ public class CodexCrafting {
         if (totalAmount != 2) return null;
 
         ItemStack firstStack = runeStacks.get(0);
-        if (firstStack.getType() != Material.FIREWORK_STAR) return null;
+        Material firstType = firstStack.getType();
+        if (firstType != Material.PRIZE_POTTERY_SHERD && firstType != Material.GUSTER_BANNER_PATTERN && firstType != Material.PRISMARINE_SHARD) return null;
 
         ItemMeta firstMeta = firstStack.getItemMeta();
         if (firstMeta == null) return null;
@@ -265,7 +320,7 @@ public class CodexCrafting {
 
         if (runeStacks.size() == 2) {
             ItemStack secondStack = runeStacks.get(1);
-            if (secondStack.getType() != Material.FIREWORK_STAR) return null;
+            if (secondStack.getType() != firstType) return null;
 
             ItemMeta secondMeta = secondStack.getItemMeta();
             if (secondMeta == null) return null;
@@ -374,7 +429,131 @@ public class CodexCrafting {
         if (id.equals("machinery.heavy_forge")) return "heavy_forge";
         if (id.equals("machinery.upgrade_table")) return "upgrade_table";
         if (id.equals("machinery.blood_altar")) return "blood_altar";
+        if (id.equals("machinery.blessings_altar")) return "blessings_altar";
+        if (id.equals("machinery.heavy_alloy_forge")) return "heavy_alloy_forge";
         return "none";
+    }
+
+    private BlockFace findBlessingsAltarGoldCenter(Block dropperBlock) {
+        BlockFace[] faces = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+        for (BlockFace face : faces) {
+            Block center = dropperBlock.getRelative(face, 2);
+            if (center.getType() == Material.GOLD_BLOCK) {
+                boolean goldValid = true;
+                for (int x = -1; x <= 1; x++) {
+                    for (int z = -1; z <= 1; z++) {
+                        if (center.getRelative(x, 0, z).getType() != Material.GOLD_BLOCK) {
+                            goldValid = false;
+                            break;
+                        }
+                    }
+                    if (!goldValid) break;
+                }
+                if (!goldValid) continue;
+
+                boolean borderValid = true;
+                for (int dx = -2; dx <= 2; dx++) {
+                    for (int dz = -2; dz <= 2; dz++) {
+                        if (Math.abs(dx) < 2 && Math.abs(dz) < 2) continue;
+                        Block borderBlock = center.getRelative(dx, 0, dz);
+                        if (borderBlock.getX() == dropperBlock.getX() && borderBlock.getZ() == dropperBlock.getZ()) {
+                            continue;
+                        }
+                        Material type = borderBlock.getType();
+                        boolean matches = type.name().contains("QUARTZ") || type.name().contains("END_STONE");
+                        if (!matches) {
+                            borderValid = false;
+                            break;
+                        }
+                    }
+                    if (!borderValid) break;
+                }
+
+                if (borderValid) {
+                    return face;
+                }
+            }
+        }
+        return null;
+    }
+
+    public void triggerBlessingsAltarSacrifice(Player player, Block fenceBlock, Dropper dropper, Location goldCenterLoc) {
+        Location searchLoc = goldCenterLoc.clone().add(0.5, 1.0, 0.5);
+        org.bukkit.entity.LivingEntity targetMob = null;
+        for (org.bukkit.entity.Entity entity : searchLoc.getWorld().getNearbyEntities(searchLoc, 1.8, 2.0, 1.8)) {
+            if (entity instanceof org.bukkit.entity.LivingEntity && !(entity instanceof Player)) {
+                targetMob = (org.bukkit.entity.LivingEntity) entity;
+                break;
+            }
+        }
+        if (targetMob == null) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("A living sacrifice must be placed on the gold altar floor!")));
+            return;
+        }
+
+        final org.bukkit.entity.LivingEntity sacrifice = targetMob;
+        player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("The heavens align... The sacrifice begins!")));
+        sacrifice.setMetadata("altar_sacrifice", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+
+        plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            if (!sacrifice.isValid() || sacrifice.isDead()) {
+                task.cancel();
+                executeHolyCraft(player, dropper, goldCenterLoc);
+                return;
+            }
+            Location mobLoc = sacrifice.getLocation();
+            mobLoc.getWorld().strikeLightning(mobLoc);
+            sacrifice.damage(4.0); // 2 hearts of damage per strike
+        }, 1L, 15L);
+    }
+
+    private void executeHolyCraft(Player player, Dropper dropper, Location dropLoc) {
+        if (player == null || !player.isOnline()) return;
+        Inventory inv = dropper.getInventory();
+        ItemStack[] contents = inv.getContents();
+
+        boolean empty = true;
+        for (ItemStack item : contents) {
+            if (item != null && item.getType() != Material.AIR) {
+                empty = false;
+                break;
+            }
+        }
+
+        if (empty) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1.0f);
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The dropper is empty!")));
+            return;
+        }
+
+        for (CodexCategory category : registry.getCategories()) {
+            for (CodexItem item : category.getItems()) {
+                String itemStation = getStationType(item.getCraftingStation());
+                if (itemStation.equals("blessings_altar")) {
+                    if (recipeMatches(contents, item)) {
+                        if (!manager.isUnlocked(player.getUniqueId(), item.getId())) {
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+                            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You haven't unlocked this recipe in the Codex!")));
+                            return;
+                        }
+
+                        consumeRecipe(dropper, item);
+                        dropLoc.getWorld().dropItemNaturally(dropLoc.clone().add(0.5, 1.1, 0.5), item.getDisplayItem());
+
+                        dropLoc.getWorld().playSound(dropLoc, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                        dropLoc.getWorld().spawnParticle(org.bukkit.Particle.FIREWORK, dropLoc.clone().add(0.5, 1.5, 0.5), 50, 0.5, 0.5, 0.5, 0.1);
+                        dropLoc.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER, dropLoc.clone().add(0.5, 1.5, 0.5), 30, 0.5, 0.5, 0.5, 0.1);
+
+                        player.sendActionBar(MM.deserialize(C_GREEN + toSmallCaps("Crafted: ") + item.getDisplayName()));
+                        return;
+                    }
+                }
+            }
+        }
+
+        player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1.0f);
+        player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Invalid holy recipe! Check the Codex for correct layouts.")));
     }
 
     public void executeBlockDuplicatorCraft(Player player, Block fenceBlock, Dropper dropper) {
@@ -541,7 +720,6 @@ public class CodexCrafting {
             case "seismic_landing": return 4;
             case "photosynthesis": return 1;
             case "zephyr": return 1;
-            case "artemis_blessing": return 1;
             case "static_charge": return 7;
             case "phantom_backstab": return 4;
             case "telekinesis": return 1;

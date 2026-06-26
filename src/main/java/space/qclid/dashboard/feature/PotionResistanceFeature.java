@@ -22,10 +22,13 @@ import static space.qclid.dashboard.util.TextUtil.*;
  */
 public class PotionResistanceFeature implements Listener {
 
+    private final JavaPlugin plugin;
+
     /** Tracks the last time each harmful effect was applied per player. */
     private final Map<UUID, Map<PotionEffectType, Long>> effectHistory = new HashMap<>();
 
     public PotionResistanceFeature(JavaPlugin plugin) {
+        this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
@@ -34,6 +37,12 @@ public class PotionResistanceFeature implements Listener {
         if (!(event.getEntity() instanceof Player player)) return;
         if (event.getAction() != EntityPotionEffectEvent.Action.ADDED
                 && event.getAction() != EntityPotionEffectEvent.Action.CHANGED) return;
+
+        // Skip plugin-applied effects (e.g. Heavy Draw slowness)
+        if (player.hasMetadata("skip_potion_resistance")) {
+            player.removeMetadata("skip_potion_resistance", plugin);
+            return;
+        }
 
         PotionEffect newEffect = event.getNewEffect();
         if (newEffect == null || newEffect.getType().getCategory() != PotionEffectTypeCategory.HARMFUL) return;

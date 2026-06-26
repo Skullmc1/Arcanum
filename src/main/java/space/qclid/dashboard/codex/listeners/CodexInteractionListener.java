@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.listeners;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -13,6 +13,9 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+import org.bukkit.Registry;
 import org.bukkit.entity.Snowball;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -31,6 +34,12 @@ import org.bukkit.potion.PotionEffectType;
 import space.qclid.dashboard.PlayerSettings;
 import space.qclid.dashboard.codex.gui.CodexMainGui;
 import space.qclid.dashboard.data.DataManager;
+
+import space.qclid.dashboard.codex.core.*;
+import space.qclid.dashboard.codex.items.*;
+import space.qclid.dashboard.codex.crafting.*;
+import space.qclid.dashboard.codex.tasks.*;
+import space.qclid.dashboard.codex.gui.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +77,38 @@ public class CodexInteractionListener implements Listener {
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
+        if (player.hasMetadata("rift_walk_active")) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK && event.getClickedBlock() != null) {
+            ItemStack held = event.getItem();
+            if (held != null && held.getType() != Material.AIR) {
+                ItemMeta heldMeta = held.getItemMeta();
+                if (heldMeta != null) {
+                    NamespacedKey idKey = new NamespacedKey(plugin, "item_id");
+                    String id = heldMeta.getPersistentDataContainer().get(idKey, PersistentDataType.STRING);
+                    if (id != null && id.equals("explorer.tools.omni_tool")) {
+                        Material blockType = event.getClickedBlock().getType();
+                        Material targetToolMat = Material.DIAMOND_PICKAXE;
+                        
+                        String name = blockType.name();
+                        if (name.contains("DIRT") || name.contains("SAND") || name.contains("GRAVEL") || name.contains("CLAY") || name.contains("SNOW") || name.contains("GRASS_BLOCK") || name.contains("SOUL_SAND") || name.contains("SOUL_SOIL")) {
+                            targetToolMat = Material.DIAMOND_SHOVEL;
+                        } else if (name.contains("LOG") || name.contains("WOOD") || name.contains("PLANKS") || name.contains("CHEST") || name.contains("FENCE") || name.contains("DOOR") || name.contains("STAIRS") || name.contains("SLAB")) {
+                            if (blockType.isSolid() && (name.contains("OAK") || name.contains("SPRUCE") || name.contains("BIRCH") || name.contains("JUNGLE") || name.contains("ACACIA") || name.contains("DARK_OAK") || name.contains("MANGROVE") || name.contains("CHERRY") || name.contains("BAMBOO") || name.contains("CRIMSON") || name.contains("WARPED"))) {
+                                targetToolMat = Material.DIAMOND_AXE;
+                            }
+                        }
+                        
+                        if (held.getType() != targetToolMat) {
+                            held.setType(targetToolMat);
+                            player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_DIAMOND, 0.5f, 1.5f);
+                        }
+                    }
+                }
+            }
+        }
         if (player.hasMetadata("interacted_entity_this_tick")) {
             return;
         }
@@ -92,6 +133,41 @@ public class CodexInteractionListener implements Listener {
         if (event.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
             Block clickedBlock = event.getClickedBlock();
             if (clickedBlock != null) {
+                // Enchanter check
+                if (codexCrafting.isValidEnchanter(clickedBlock)) {
+                    event.setCancelled(true);
+                    openEnchanterGUI(player);
+                    return;
+                }
+                // Disenchanter check
+                if (codexCrafting.isValidDisenchanter(clickedBlock)) {
+                    event.setCancelled(true);
+                    openDisenchanterGUI(player);
+                    return;
+                }
+
+                // Blessings Altar check
+                if (clickedBlock.getType().name().contains("FENCE") && !clickedBlock.getType().name().contains("NETHER")) {
+                    Dropper dropper = codexCrafting.getDropperForStructure(clickedBlock, "blessings_altar");
+                    if (dropper != null) {
+                        event.setCancelled(true);
+                        Block dropperBlock = clickedBlock.getRelative(BlockFace.DOWN);
+                        BlockFace goldCenterDir = null;
+                        BlockFace[] horizontalFaces = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+                        for (BlockFace face : horizontalFaces) {
+                            if (dropperBlock.getRelative(face, 2).getType() == Material.GOLD_BLOCK) {
+                                goldCenterDir = face;
+                                break;
+                            }
+                        }
+                        if (goldCenterDir != null) {
+                            Location goldCenterLoc = dropperBlock.getRelative(goldCenterDir, 2).getLocation();
+                            codexCrafting.triggerBlessingsAltarSacrifice(player, clickedBlock, dropper, goldCenterLoc);
+                        }
+                        return;
+                    }
+                }
+
                 // Blood Altar check
                 if (clickedBlock.getType() == Material.RED_CARPET) {
                     Block below = clickedBlock.getRelative(BlockFace.DOWN);
@@ -186,6 +262,13 @@ public class CodexInteractionListener implements Listener {
                             codexCrafting.executeDropperCraft(player, dropper, "upgrade_table", clickedBlock.getLocation().add(0.5, 1.1, 0.5));
                             return;
                         }
+                    } else if (clickedBlock.getType() == Material.BLAST_FURNACE) {
+                        Dropper dropper = codexCrafting.getDropperForStructure(clickedBlock, "heavy_alloy_forge");
+                        if (dropper != null) {
+                            event.setCancelled(true);
+                            codexCrafting.executeDropperCraft(player, dropper, "heavy_alloy_forge", clickedBlock.getLocation().add(0.5, 1.1, 0.5));
+                            return;
+                        }
                     }
                 } else {
                     // Normal right-click: machine open detection
@@ -236,6 +319,193 @@ public class CodexInteractionListener implements Listener {
         // 2. Custom Codex Items — only fire on right-click
         NamespacedKey itemKey = new NamespacedKey(plugin, "item_id");
         String itemId = meta.getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
+        
+        NamespacedKey remediumKey = new NamespacedKey(plugin, "rune_remedium");
+        if (meta.getPersistentDataContainer().has(remediumKey, PersistentDataType.INTEGER)) {
+            if (player.isSneaking() && event.getAction().name().contains("RIGHT")) {
+                event.setCancelled(true);
+                if (player.hasCooldown(item.getType())) return;
+                
+                double currentHp = player.getHealth();
+                if (currentHp > 1.0) {
+                    player.setHealth(Math.max(1.0, currentHp * 0.5));
+                    for (PotionEffect effect : player.getActivePotionEffects()) {
+                        if (isNegativeEffect(effect.getType())) {
+                            player.removePotionEffect(effect.getType());
+                        }
+                    }
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 200, 1)); // Strength II
+                    
+                    player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.8f);
+                    player.getWorld().spawnParticle(org.bukkit.Particle.WITCH, player.getLocation(), 20, 0.5, 1.0, 0.5, 0.1);
+                    player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Remedium: Purged negative effects for 50% health!")));
+                    setCooldown(player, item.getType(), 400); // 20s cooldown
+                }
+                return;
+            }
+        }
+
+        if (itemId == null) return;
+
+        if (!event.getAction().name().contains("RIGHT")) return;
+
+        if (itemId.equals("arcane.tomes.glintblade_phalanx")) {
+            event.setCancelled(true);
+            if (player.hasCooldown(Material.GLOBE_BANNER_PATTERN)) return;
+            setCooldown(player, Material.GLOBE_BANNER_PATTERN, 300); // 15s cooldown
+            player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1f, 1.2f);
+            
+            final UUID playerUuid = player.getUniqueId();
+            int[] tick = new int[]{0};
+            
+            // Spawn 4 invisible marker armor stands holding diamond swords
+            java.util.List<org.bukkit.entity.ArmorStand> stands = new java.util.ArrayList<>();
+            Location spawnLoc = player.getLocation();
+            for (int i = 0; i < 4; i++) {
+                org.bukkit.entity.ArmorStand stand = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.ArmorStand.class, s -> {
+                    s.setInvisible(true);
+                    s.setSmall(true);
+                    s.setMarker(true);
+                    s.setGravity(false);
+                    s.setPersistent(false);
+                    s.getEquipment().setItemInMainHand(new ItemStack(Material.DIAMOND_SWORD));
+                    s.setRightArmPose(new org.bukkit.util.EulerAngle(-Math.PI / 2.0, 0, 0));
+                });
+                stands.add(stand);
+            }
+            
+            plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, t -> {
+                tick[0]++;
+                Player p = Bukkit.getPlayer(playerUuid);
+                
+                if (p == null || !p.isOnline() || p.isDead() || tick[0] > 300 || stands.isEmpty()) {
+                    t.cancel();
+                    // Clean up stands
+                    for (org.bukkit.entity.ArmorStand s : stands) {
+                        s.remove();
+                    }
+                    stands.clear();
+                    return;
+                }
+                
+                Location loc = p.getLocation();
+                double angleOffset = tick[0] * 0.15;
+                int currentBlades = stands.size();
+                for (int i = 0; i < currentBlades; i++) {
+                    double angle = angleOffset + i * (Math.PI * 2.0 / currentBlades);
+                    double x = Math.cos(angle) * 1.5;
+                    double z = Math.sin(angle) * 1.5;
+                    Location bladeLoc = loc.clone().add(x, 0.5, z);
+                    
+                    // Face the rotation direction
+                    bladeLoc.setYaw((float) Math.toDegrees(angle) + 90f);
+                    stands.get(i).teleport(bladeLoc);
+                }
+                
+                if (tick[0] % 10 == 0) {
+                    LivingEntity target = null;
+                    
+                    // 1. Check phalanx_target metadata
+                    if (p.hasMetadata("phalanx_target")) {
+                        try {
+                            UUID targetUuid = UUID.fromString(p.getMetadata("phalanx_target").get(0).asString());
+                            Entity ent = Bukkit.getEntity(targetUuid);
+                            if (ent instanceof LivingEntity le && !le.isDead() && le.getWorld().equals(p.getWorld()) && le.getLocation().distance(p.getLocation()) <= 6.0) {
+                                target = le;
+                            }
+                        } catch (Exception e) {
+                            // Ignore
+                        }
+                    }
+                    
+                    // 2. Find nearby hostiles, angered neutral mobs, or players the player might be fighting
+                    if (target == null) {
+                        for (Entity entity : p.getNearbyEntities(6.0, 3.0, 6.0)) {
+                            if (entity instanceof LivingEntity le && !le.isDead() && isCombatPartner(p, le)) {
+                                target = le;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (target != null) {
+                        org.bukkit.entity.ArmorStand standToRemove = stands.remove(stands.size() - 1);
+                        standToRemove.remove();
+                        
+                        target.damage(6.0, p);
+                        Location mLoc = target.getEyeLocation();
+                        mLoc.getWorld().playSound(mLoc, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.5f);
+                        mLoc.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, mLoc, 8, 0.2, 0.2, 0.2, 0.05);
+                    }
+                }
+            }, 1L, 1L);
+            return;
+        }
+
+        if (itemId.startsWith("explorer.tools.locator.")) {
+            event.setCancelled(true);
+            NamespacedKey key = new NamespacedKey(plugin, "charges");
+            int charges = meta.getPersistentDataContainer().getOrDefault(key, PersistentDataType.INTEGER, 10);
+            if (charges <= 0) {
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("This locator has no charges remaining!")));
+                return;
+            }
+            
+            String struct = itemId.substring(itemId.lastIndexOf('.') + 1);
+            NamespacedKey structureKey = null;
+            
+            switch (struct.toLowerCase()) {
+                case "village": structureKey = NamespacedKey.minecraft("village_plains"); break;
+                case "stronghold": structureKey = NamespacedKey.minecraft("stronghold"); break;
+                case "end_city": structureKey = NamespacedKey.minecraft("end_city"); break;
+                case "mineshaft": structureKey = NamespacedKey.minecraft("mineshaft"); break;
+                case "mansion": structureKey = NamespacedKey.minecraft("woodland_mansion"); break;
+                case "monument": structureKey = NamespacedKey.minecraft("ocean_monument"); break;
+                case "fortress": structureKey = NamespacedKey.minecraft("fortress"); break;
+                case "pillager_outpost": structureKey = NamespacedKey.minecraft("pillager_outpost"); break;
+                case "desert_pyramid": structureKey = NamespacedKey.minecraft("desert_pyramid"); break;
+                case "jungle_pyramid": structureKey = NamespacedKey.minecraft("jungle_temple"); break;
+                case "swamp_hut": structureKey = NamespacedKey.minecraft("swamp_hut"); break;
+                case "ocean_ruin": structureKey = NamespacedKey.minecraft("ocean_ruin_cold"); break;
+                case "shipwreck": structureKey = NamespacedKey.minecraft("shipwreck"); break;
+                case "igloo": structureKey = NamespacedKey.minecraft("igloo"); break;
+            }
+            
+            if (structureKey == null) {
+                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Structure locator type not supported!")));
+                return;
+            }
+            
+            org.bukkit.generator.structure.Structure structureObj = org.bukkit.Registry.STRUCTURE.get(structureKey);
+            
+            Location found = null;
+            if (structureObj != null) {
+                org.bukkit.util.StructureSearchResult searchResult = player.getWorld().locateNearestStructure(player.getLocation(), structureObj, 100, false);
+                if (searchResult != null) {
+                    found = searchResult.getLocation();
+                }
+            }
+            
+            if (found != null) {
+                charges--;
+                meta.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, charges);
+                String structName = Character.toUpperCase(struct.charAt(0)) + struct.substring(1).replace("_", " ");
+                meta.lore(List.of(
+                        MM.deserialize(C_GRAY + toSmallCaps("Locates the nearest " + structName + ".")),
+                        MM.deserialize(""),
+                        MM.deserialize(C_YELLOW + toSmallCaps("Charges") + ": " + C_ORANGE + charges + " / 10")
+                ));
+                item.setItemMeta(meta);
+                
+                player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1f, 1f);
+                player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Nearest ") + C_GOLD + structName + C_GREEN + toSmallCaps(" located at: ") + C_YELLOW + found.getBlockX() + ", " + found.getBlockY() + ", " + found.getBlockZ()));
+            } else {
+                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("No structure found within 100 chunks!")));
+            }
+            return;
+        }
+
         if (itemId == null) return;
 
         if (!event.getAction().name().contains("RIGHT")) return;
@@ -276,7 +546,7 @@ public class CodexInteractionListener implements Listener {
             });
             stand.setLeashHolder(player);
 
-            player.setCooldown(Material.LEAD, 80); // 4 s cooldown
+            setCooldown(player, Material.LEAD, 80); // 4 s cooldown
             player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
 
             final Snowball finalSnowball = snowball;
@@ -303,7 +573,7 @@ public class CodexInteractionListener implements Listener {
         if (itemId.equals("arcane.ranged.wand_of_levitation")) {
             event.setCancelled(true);
             if (player.hasCooldown(Material.FEATHER)) return;
-            player.setCooldown(Material.FEATHER, 300); // 15s cooldown
+            setCooldown(player, Material.FEATHER, 300); // 15s cooldown
             Snowball snowball = player.launchProjectile(Snowball.class);
             snowball.setMetadata("levitation_projectile", new FixedMetadataValue(plugin, true));
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_PEARL_THROW, 1f, 1.2f);
@@ -324,7 +594,7 @@ public class CodexInteractionListener implements Listener {
             }
 
             if (strikeLoc != null) {
-                player.setCooldown(Material.LIGHTNING_ROD, 400); // 20s cooldown
+                setCooldown(player, Material.LIGHTNING_ROD, 400); // 20s cooldown
                 strikeLoc.getWorld().strikeLightning(strikeLoc);
                 player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.8f, 1f);
             } else {
@@ -336,7 +606,7 @@ public class CodexInteractionListener implements Listener {
         if (itemId.equals("explorer.exploration.ore_scanner")) {
             event.setCancelled(true);
             if (player.hasCooldown(Material.SPYGLASS)) return;
-            player.setCooldown(Material.SPYGLASS, 600); // 30s cooldown
+            setCooldown(player, Material.SPYGLASS, 600); // 30s cooldown
 
             player.playSound(player.getLocation(), Sound.BLOCK_SWEET_BERRY_BUSH_PICK_BERRIES, 1f, 1.5f);
 
@@ -390,14 +660,14 @@ public class CodexInteractionListener implements Listener {
             if (player.hasCooldown(Material.BLAZE_ROD)) return;
             player.launchProjectile(org.bukkit.entity.SmallFireball.class);
             player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1f, 1f);
-            player.setCooldown(Material.BLAZE_ROD, 30); // 1.5 s cooldown
+            setCooldown(player, Material.BLAZE_ROD, 30); // 1.5 s cooldown
             return;
         }
 
         if (itemId.equals("arcane.ranged.staff_of_supplant")) {
             event.setCancelled(true);
             if (player.hasCooldown(Material.IRON_HOE)) return;
-            player.setCooldown(Material.IRON_HOE, 60); // 3s cooldown
+            setCooldown(player, Material.IRON_HOE, 60); // 3s cooldown
             Snowball snowball = player.launchProjectile(Snowball.class);
             snowball.setMetadata("supplant_projectile", new FixedMetadataValue(plugin, true));
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_PEARL_THROW, 1f, 1f);
@@ -548,7 +818,7 @@ public class CodexInteractionListener implements Listener {
         if (itemId.equals("explorer.tools.webber")) {
             event.setCancelled(true);
             if (player.hasCooldown(Material.COBWEB)) return;
-            player.setCooldown(Material.COBWEB, 20); // 1s cooldown
+            setCooldown(player, Material.COBWEB, 20); // 1s cooldown
 
             Snowball snowball = player.launchProjectile(Snowball.class);
             snowball.setMetadata("web_projectile", new FixedMetadataValue(plugin, true));
@@ -637,7 +907,7 @@ public class CodexInteractionListener implements Listener {
         if (itemId.equals("explorer.tools.beastmasters_flute")) {
             event.setCancelled(true);
             if (player.hasCooldown(Material.BAMBOO)) return;
-            player.setCooldown(Material.BAMBOO, 1200);
+            setCooldown(player, Material.BAMBOO, 1200);
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_FLUTE, 1.5f, 1f);
             player.getWorld().spawnParticle(org.bukkit.Particle.NOTE, player.getLocation().add(0, 1.5, 0), 10, 0.5, 0.5, 0.5);
 
@@ -792,7 +1062,7 @@ public class CodexInteractionListener implements Listener {
         before.getWorld().playSound(before, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
         loc.getWorld().playSound(loc, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
 
-        player.setCooldown(Material.COMPASS, 200);
+        setCooldown(player, Material.COMPASS, 200);
         player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Teleported to waypoint: ") + C_ORANGE + waypointName));
     }
 
@@ -985,6 +1255,37 @@ public class CodexInteractionListener implements Listener {
                             }
                         } else {
                             log.getWorld().dropItemNaturally(log.getLocation(), finalDrop);
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // Daedalus' Touch — check BEFORE smelt/tele so it handles ore blocks first
+        NamespacedKey dtKey = new NamespacedKey(plugin, "rune_daedalus_touch");
+        boolean hasDaedalus = meta.getPersistentDataContainer().has(dtKey, PersistentDataType.INTEGER);
+        if (hasDaedalus && player.isSneaking() && block.getType().name().contains("ORE")) {
+            Material oreType = block.getType();
+            List<Block> ores = new ArrayList<>();
+            findContiguousOres(block, oreType, ores, new java.util.HashSet<>(), 16);
+            
+            event.setCancelled(true);
+            for (Block ore : ores) {
+                if (ore.getType() == oreType) {
+                    java.util.Collection<ItemStack> oreDrops = ore.getDrops(item, player);
+                    ore.setType(Material.AIR);
+                    damageTool(player, item, 1);
+                    
+                    for (ItemStack drop : oreDrops) {
+                        ItemStack finalDrop = hasSmelt ? smeltItemIfPossible(drop) : drop;
+                        if (hasTele) {
+                            java.util.Map<Integer, ItemStack> leftover = player.getInventory().addItem(finalDrop);
+                            for (ItemStack dropLeft : leftover.values()) {
+                                ore.getWorld().dropItemNaturally(ore.getLocation(), dropLeft);
+                            }
+                        } else {
+                            ore.getWorld().dropItemNaturally(ore.getLocation(), finalDrop);
                         }
                     }
                 }
@@ -1188,5 +1489,441 @@ public class CodexInteractionListener implements Listener {
         }
 
         return "none";
+    }
+
+    // ── Enchanter & Disenchanter GUIs ────────────────────────────────────────
+
+    private void openEnchanterGUI(Player player) {
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held.getType() == Material.AIR) {
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You must be holding an item!")));
+            return;
+        }
+
+        List<Enchantment> possible = new ArrayList<>();
+        for (Enchantment ench : Registry.ENCHANTMENT) {
+            if (ench.canEnchantItem(held) || held.getType() == Material.ENCHANTED_BOOK) possible.add(ench);
+        }
+        if (possible.isEmpty()) {
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("This item cannot be enchanted!")));
+            return;
+        }
+
+        int size = Math.min(54, Math.max(9, ((possible.size() / 9) + 1) * 9));
+        Inventory inv = Bukkit.createInventory(null, size, parse(G_GOLD + toSmallCaps("Enchanter")));
+
+        for (Enchantment ench : possible) {
+            int currentLevel = held.getType() == Material.ENCHANTED_BOOK
+                    ? ((EnchantmentStorageMeta) held.getItemMeta()).getStoredEnchantLevel(ench)
+                    : held.getEnchantmentLevel(ench);
+            if (currentLevel >= ench.getMaxLevel()) continue;
+
+            int nextLevel = currentLevel + 1;
+            int cost      = (ench.getMaxLevel() == 1) ? 3 : nextLevel;
+
+            ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
+            EnchantmentStorageMeta meta = (EnchantmentStorageMeta) book.getItemMeta();
+            if (meta != null) {
+                meta.addStoredEnchant(ench, nextLevel, true);
+                meta.displayName(parse(G_GOLD + toSmallCaps(ench.key().value().replace("_", " ")) + " " + nextLevel));
+                meta.lore(List.of(MM.deserialize(C_YELLOW + toSmallCaps("Cost") + ": " + C_ORANGE + cost + " " + toSmallCaps("diamonds"))));
+                book.setItemMeta(meta);
+            }
+            inv.addItem(book);
+        }
+        player.openInventory(inv);
+    }
+
+    private void openDisenchanterGUI(Player player) {
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held.getType() == Material.AIR) {
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You must be holding an item!")));
+            return;
+        }
+
+        Map<Enchantment, Integer> enchants = held.getType() == Material.ENCHANTED_BOOK
+                ? ((EnchantmentStorageMeta) held.getItemMeta()).getStoredEnchants()
+                : held.getEnchantments();
+
+        if (enchants.isEmpty()) {
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("This item has no enchantments!")));
+            return;
+        }
+
+        int size = Math.min(54, Math.max(9, ((enchants.size() / 9) + 1) * 9));
+        Inventory inv = Bukkit.createInventory(null, size, parse(G_GOLD + toSmallCaps("Disenchanter")));
+
+        for (Map.Entry<Enchantment, Integer> e : enchants.entrySet()) {
+            int refund = (e.getKey().getMaxLevel() == 1) ? 3 : e.getValue();
+            ItemStack book = new ItemStack(Material.ENCHANTED_BOOK);
+            EnchantmentStorageMeta meta = (EnchantmentStorageMeta) book.getItemMeta();
+            if (meta != null) {
+                meta.addStoredEnchant(e.getKey(), e.getValue(), true);
+                meta.displayName(parse(G_GOLD + toSmallCaps(e.getKey().key().value().replace("_", " ")) + " " + e.getValue()));
+                meta.lore(List.of(MM.deserialize(C_GREEN + toSmallCaps("Refund") + ": " + C_ORANGE + refund + " " + toSmallCaps("diamonds"))));
+                book.setItemMeta(meta);
+            }
+            inv.addItem(book);
+        }
+        player.openInventory(inv);
+    }
+
+    @EventHandler
+    public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        if (event.getInventory().getHolder() instanceof CodexInventoryHolder || 
+            event.getInventory().getHolder() instanceof WaypointLinkInventoryHolder) {
+            return;
+        }
+
+        net.kyori.adventure.text.Component titleComp = event.getView().title();
+        String plainTitle = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(titleComp);
+
+        boolean isDisenchant = plainTitle.contains(toSmallCaps("Disenchanter"));
+        boolean isEnchant    = !isDisenchant && plainTitle.contains(toSmallCaps("Enchanter"));
+        if (!isEnchant && !isDisenchant) return;
+
+        event.setCancelled(true);
+        if (event.getClickedInventory() != event.getView().getTopInventory()) return;
+
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType() != Material.ENCHANTED_BOOK) return;
+
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held.getType() == Material.AIR) return;
+
+        EnchantmentStorageMeta bookMeta = (EnchantmentStorageMeta) clicked.getItemMeta();
+        if (bookMeta == null || !bookMeta.hasStoredEnchants()) return;
+
+        Map.Entry<Enchantment, Integer> entry = bookMeta.getStoredEnchants().entrySet().iterator().next();
+        Enchantment ench = entry.getKey();
+        int level        = entry.getValue();
+
+        if (isEnchant) {
+            int cost = (ench.getMaxLevel() == 1) ? 3 : level;
+            if (!player.getInventory().containsAtLeast(new ItemStack(Material.DIAMOND), cost)) {
+                player.closeInventory();
+                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You need " + cost + " diamonds!")));
+                return;
+            }
+            player.getInventory().removeItem(new ItemStack(Material.DIAMOND, cost));
+
+            if (held.getType() == Material.ENCHANTED_BOOK) {
+                EnchantmentStorageMeta meta = (EnchantmentStorageMeta) held.getItemMeta();
+                if (meta != null) {
+                    meta.addStoredEnchant(ench, level, true);
+                    held.setItemMeta(meta);
+                }
+            } else {
+                held.addUnsafeEnchantment(ench, level);
+            }
+            player.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1f, 1f);
+            openEnchanterGUI(player);
+
+        } else {
+            int refund = (ench.getMaxLevel() == 1) ? 3 : level;
+
+            if (held.getType() == Material.ENCHANTED_BOOK) {
+                EnchantmentStorageMeta meta = (EnchantmentStorageMeta) held.getItemMeta();
+                if (meta != null) {
+                    meta.removeStoredEnchant(ench);
+                    held.setItemMeta(meta);
+                }
+            } else {
+                held.removeEnchantment(ench);
+            }
+            player.getInventory().addItem(new ItemStack(Material.DIAMOND, refund));
+            player.playSound(player.getLocation(), Sound.BLOCK_GRINDSTONE_USE, 1f, 1f);
+
+            Map<Enchantment, Integer> remaining = held.getType() == Material.ENCHANTED_BOOK
+                    ? ((EnchantmentStorageMeta) held.getItemMeta()).getStoredEnchants()
+                    : held.getEnchantments();
+            if (remaining.isEmpty()) player.closeInventory();
+            else openDisenchanterGUI(player);
+        }
+    }
+
+    // ── Kinetic Crusher & Sifting Trommel ────────────────────────────────────
+
+    @EventHandler
+    public void onPistonExtend(org.bukkit.event.block.BlockPistonExtendEvent event) {
+        Block pistonBlock = event.getBlock();
+        if (!(pistonBlock.getBlockData() instanceof org.bukkit.block.data.type.Piston pistonData)) return;
+
+        if (pistonData.getFacing() == BlockFace.DOWN) {
+            Block crushSpace = pistonBlock.getRelative(BlockFace.DOWN);
+            Block hopperBlock = crushSpace.getRelative(BlockFace.DOWN);
+            if (hopperBlock.getType() == Material.HOPPER) {
+                Block baseCenter = hopperBlock.getRelative(BlockFace.DOWN);
+                boolean baseValid = true;
+                for (int x = -1; x <= 1; x++) {
+                    for (int z = -1; z <= 1; z++) {
+                        if (baseCenter.getRelative(x, 0, z).getType() != Material.IRON_BLOCK) {
+                            baseValid = false;
+                            break;
+                        }
+                    }
+                    if (!baseValid) break;
+                }
+
+                if (baseValid) {
+                    Location searchLoc = crushSpace.getLocation().add(0.5, 0.5, 0.5);
+                    java.util.Collection<org.bukkit.entity.Item> items = searchLoc.getWorld().getNearbyEntitiesByType(org.bukkit.entity.Item.class, searchLoc, 0.8);
+                    for (org.bukkit.entity.Item itemEntity : items) {
+                        ItemStack stack = itemEntity.getItemStack();
+                        if (stack.getType() == Material.ENDER_PEARL) {
+                            int amount = stack.getAmount();
+                            itemEntity.remove();
+                            ItemStack dust = arcaneItems.getCustomItem("arcane.materials.crushed_ender_dust");
+                            if (dust != null) {
+                                dust = dust.clone();
+                                dust.setAmount(amount * 2);
+                                crushSpace.getWorld().dropItemNaturally(crushSpace.getLocation().add(0.5, 0.1, 0.5), dust);
+                            }
+                            crushSpace.getWorld().playSound(crushSpace.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.6f, 1.5f);
+                            crushSpace.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, crushSpace.getLocation().add(0.5, 0.5, 0.5), 15, 0.2, 0.2, 0.2);
+                        } else if (stack.getType() == Material.BLAZE_ROD) {
+                            int amount = stack.getAmount();
+                            itemEntity.remove();
+                            ItemStack powder = new ItemStack(Material.BLAZE_POWDER, amount * 4);
+                            crushSpace.getWorld().dropItemNaturally(crushSpace.getLocation().add(0.5, 0.1, 0.5), powder);
+                            crushSpace.getWorld().playSound(crushSpace.getLocation(), Sound.BLOCK_ANVIL_LAND, 0.6f, 1.2f);
+                            crushSpace.getWorld().spawnParticle(org.bukkit.Particle.LAVA, crushSpace.getLocation().add(0.5, 0.5, 0.5), 15, 0.2, 0.2, 0.2);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onInventoryPickupItem(org.bukkit.event.inventory.InventoryPickupItemEvent event) {
+        if (event.getInventory().getType() != org.bukkit.event.inventory.InventoryType.HOPPER) return;
+
+        Block hopperBlock = event.getInventory().getLocation().getBlock();
+        Block aboveBlock = hopperBlock.getRelative(BlockFace.UP);
+        if (aboveBlock.getType() != Material.IRON_BARS) return;
+
+        BlockFace[] horizontalFaces = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+        boolean copperSurrounded = true;
+        for (BlockFace face : horizontalFaces) {
+            Material type = hopperBlock.getRelative(face).getType();
+            if (!type.name().contains("COPPER")) {
+                copperSurrounded = false;
+                break;
+            }
+        }
+        if (!copperSurrounded) return;
+
+        org.bukkit.entity.Item itemEntity = event.getItem();
+        ItemStack stack = itemEntity.getItemStack();
+        Material itemType = stack.getType();
+
+        if (itemType == Material.GRAVEL || itemType == Material.SAND || itemType == Material.RED_SAND || itemType == Material.DIRT) {
+            event.setCancelled(true);
+
+            int newAmount = stack.getAmount() - 1;
+            if (newAmount <= 0) {
+                itemEntity.remove();
+            } else {
+                stack.setAmount(newAmount);
+                itemEntity.setItemStack(stack);
+            }
+
+            Location siftLoc = aboveBlock.getLocation().add(0.5, 0.2, 0.5);
+            Sound breakSound = (itemType == Material.SAND || itemType == Material.RED_SAND) ? Sound.BLOCK_SAND_BREAK : Sound.BLOCK_GRAVEL_BREAK;
+            siftLoc.getWorld().playSound(siftLoc, breakSound, 0.8f, 1f);
+            siftLoc.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, siftLoc, 10, 0.2, 0.2, 0.2, Bukkit.createBlockData(itemType));
+
+            double rand = Math.random();
+            ItemStack output = null;
+            if (rand < 0.05) {
+                output = arcaneItems.getCustomItem("arcane.materials.fractured_geode");
+            } else if (rand < 0.15) {
+                output = new ItemStack(Material.RAW_GOLD);
+            } else if (rand < 0.40) {
+                output = new ItemStack(Material.FLINT);
+            }
+
+            if (output != null) {
+                aboveBlock.getWorld().dropItemNaturally(aboveBlock.getLocation().add(0.5, 0.5, 0.5), output.clone());
+                aboveBlock.getWorld().playSound(aboveBlock.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.5f);
+            }
+        }
+    }
+
+    private void setCooldown(Player player, Material material, int ticks) {
+        if (codexPassiveTask.isWearingFullSet(player, "storm_weaver")) {
+            ticks = ticks / 2;
+        }
+        player.setCooldown(material, ticks);
+    }
+
+    private void findContiguousOres(Block current, Material oreType, List<Block> result, java.util.Set<Location> visited, int limit) {
+        if (result.size() >= limit || visited.contains(current.getLocation())) return;
+        visited.add(current.getLocation());
+
+        if (current.getType() == oreType) {
+            result.add(current);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        findContiguousOres(current.getRelative(dx, dy, dz), oreType, result, visited, limit);
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onBlockDamage(org.bukkit.event.block.BlockDamageEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType() == Material.AIR) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
+        
+        NamespacedKey idKey = new NamespacedKey(plugin, "item_id");
+        String id = meta.getPersistentDataContainer().get(idKey, PersistentDataType.STRING);
+        if (id != null && id.equals("explorer.tools.omni_tool")) {
+            Material blockType = event.getBlock().getType();
+            Material targetToolMat = Material.DIAMOND_PICKAXE;
+            
+            String name = blockType.name();
+            if (name.contains("DIRT") || name.contains("SAND") || name.contains("GRAVEL") || name.contains("CLAY") || name.contains("SNOW") || name.contains("GRASS_BLOCK") || name.contains("SOUL_SAND") || name.contains("SOUL_SOIL")) {
+                targetToolMat = Material.DIAMOND_SHOVEL;
+            } else if (name.contains("LOG") || name.contains("WOOD") || name.contains("PLANKS") || name.contains("CHEST") || name.contains("FENCE") || name.contains("DOOR") || name.contains("STAIRS") || name.contains("SLAB")) {
+                if (blockType.isSolid() && (name.contains("OAK") || name.contains("SPRUCE") || name.contains("BIRCH") || name.contains("JUNGLE") || name.contains("ACACIA") || name.contains("DARK_OAK") || name.contains("MANGROVE") || name.contains("CHERRY") || name.contains("BAMBOO") || name.contains("CRIMSON") || name.contains("WARPED"))) {
+                    targetToolMat = Material.DIAMOND_AXE;
+                }
+            }
+            
+            if (item.getType() != targetToolMat) {
+                item.setType(targetToolMat);
+                player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_DIAMOND, 0.5f, 1.5f);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerItemDamage(org.bukkit.event.player.PlayerItemDamageEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
+        if (item.getType() == Material.SHIELD) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                NamespacedKey key = new NamespacedKey(plugin, "rune_ouroboros");
+                if (meta.getPersistentDataContainer().has(key, PersistentDataType.INTEGER)) {
+                    Damageable damageable = (Damageable) meta;
+                    int maxDurability = item.getType().getMaxDurability();
+                    int currentDamage = damageable.getDamage();
+                    int newDamage = currentDamage + event.getDamage();
+                    
+                    if (newDamage >= maxDurability) {
+                        boolean consumed = false;
+                        for (ItemStack invItem : player.getInventory().getContents()) {
+                            if (invItem != null) {
+                                ItemMeta im = invItem.getItemMeta();
+                                if (im != null) {
+                                    NamespacedKey itemIdKey = new NamespacedKey(plugin, "item_id");
+                                    String id = im.getPersistentDataContainer().get(itemIdKey, PersistentDataType.STRING);
+                                    if (id != null && id.equals("arcane.materials.ender_essence")) {
+                                        invItem.setAmount(invItem.getAmount() - 1);
+                                        consumed = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (consumed) {
+                            event.setCancelled(true);
+                            damageable.setDamage(0);
+                            item.setItemMeta((ItemMeta) damageable);
+                            player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1f, 1.2f);
+                            player.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, player.getLocation(), 15, 0.3, 0.5, 0.3, 0.1);
+                            player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Ouroboros Shield consumed Ender Essence to restore durability!")));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerItemConsume(org.bukkit.event.player.PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        ItemStack item = event.getItem();
+        if (item != null && item.getType() != Material.AIR) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                NamespacedKey key = new NamespacedKey(plugin, "item_id");
+                String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+                if (id != null && id.equals("arcane.materials.blood_orb")) {
+                    event.setCancelled(true);
+                    
+                    if (item.getAmount() <= 1) {
+                        player.getInventory().setItem(event.getHand(), null);
+                    } else {
+                        item.setAmount(item.getAmount() - 1);
+                        player.getInventory().setItem(event.getHand(), item);
+                    }
+                    
+                    player.setFoodLevel(20);
+                    player.setSaturation(20f);
+                    player.getWorld().playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 1f, 1f);
+                    player.getWorld().spawnParticle(org.bukkit.Particle.DAMAGE_INDICATOR, player.getLocation().add(0, 1, 0), 10, 0.2, 0.2, 0.2);
+                    player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Consumed Blood Orb: Hunger and Saturation completely restored!")));
+                }
+            }
+        }
+    }
+
+    private boolean isCombatPartner(Player p, LivingEntity le) {
+        if (p.equals(le)) return false;
+        if (le instanceof Player otherPlayer) {
+            if (otherPlayer.hasMetadata("phalanx_target")) {
+                try {
+                    String targetUuidStr = otherPlayer.getMetadata("phalanx_target").get(0).asString();
+                    if (p.getUniqueId().toString().equals(targetUuidStr)) {
+                        return true;
+                    }
+                } catch (Exception e) {}
+            }
+            if (p.hasMetadata("phalanx_target")) {
+                try {
+                    String targetUuidStr = p.getMetadata("phalanx_target").get(0).asString();
+                    if (otherPlayer.getUniqueId().toString().equals(targetUuidStr)) {
+                        return true;
+                    }
+                } catch (Exception e) {}
+            }
+        } else {
+            if (le instanceof org.bukkit.entity.Monster) {
+                return true;
+            }
+            if (le instanceof org.bukkit.entity.Creature creature && p.equals(creature.getTarget())) {
+                return true;
+            }
+            if (p.hasMetadata("phalanx_target")) {
+                try {
+                    String targetUuidStr = p.getMetadata("phalanx_target").get(0).asString();
+                    if (le.getUniqueId().toString().equals(targetUuidStr)) {
+                        return true;
+                    }
+                } catch (Exception e) {}
+            }
+            if (le.hasMetadata("phalanx_target")) {
+                try {
+                    String targetUuidStr = le.getMetadata("phalanx_target").get(0).asString();
+                    if (p.getUniqueId().toString().equals(targetUuidStr)) {
+                        return true;
+                    }
+                } catch (Exception e) {}
+            }
+        }
+        return false;
     }
 }

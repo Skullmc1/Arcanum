@@ -32,7 +32,6 @@ public class DashboardPlugin extends JavaPlugin {
         PosFeature           posFeature            = new PosFeature();
         LinkedChestFeature   linkedChestFeature    = new LinkedChestFeature(dataManager);
         DeathInventoryFeature deathInventoryFeature = new DeathInventoryFeature(this, dataManager);
-        EnchantFeature       enchantFeature         = new EnchantFeature(this);
         space.qclid.dashboard.codex.CodexFeature codexFeature = new space.qclid.dashboard.codex.CodexFeature(this, dataManager);
 
         // passive listeners (no commands)
@@ -49,7 +48,6 @@ public class DashboardPlugin extends JavaPlugin {
             posFeature          .registerCommands(commands);
             linkedChestFeature  .registerCommands(commands);
             deathInventoryFeature.registerCommands(commands);
-            enchantFeature      .registerCommands(commands);
             codexFeature        .registerCommands(commands);
         });
 

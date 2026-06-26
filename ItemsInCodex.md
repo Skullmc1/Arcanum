@@ -1,357 +1,579 @@
-# 📖 Items in Codex
+# Items in Codex
 
-This document lists all the custom items, runes, structures, and tools that have been fully created, registered, and are active in the Codex system.
+This document lists all custom items, runes, structures, and tools that have been fully created, registered, and are active in the Codex system.
 
 ---
 
-## 🏗️ Crafting Stations & Machinery (Multiblock Structures)
+## Crafting Stations & Machinery (Multiblock Structures)
 
-### 1. Arcana Table
-- **Item ID**: `machinery.arcana_table` (Reference item)
-- **Structure**: Crafting Table horizontally adjacent to at least 2 Bookshelves, all on top of a Dropper.
-- **Description**: Used to craft mystical Arcane items and Enchantment Runes.
+### Arcana Table
+- **ID**: `machinery.arcana_table`
+- **Structure**: Crafting Table on top of a Dropper with Bookshelves on the sides of the Dropper.
+- **Used to craft**: Mystical Arcane items and Enchantment Runes.
 
-### 2. Heavy Forge
-- **Item ID**: `machinery.heavy_forge` (Reference item)
-- **Structure**: Crafting Table placed directly on top of a Blast Furnace on top of a Dropper.
-- **Description**: Used to forge heavy Explorer tools, gadgets, and compressed alloys.
+### Heavy Forge
+- **ID**: `machinery.heavy_forge`
+- **Structure**: Crafting Table on top of a Blast Furnace on top of a Dropper.
+- **Used to forge**: Heavy Explorer tools, gadgets, and compressed alloys.
 
-### 3. Upgrade Table
-- **Item ID**: `machinery.upgrade_table` (Reference item)
-- **Structure**: Anvil placed on top of a Dropper on top of a Bookshelf.
-- **Description**: Used to combine matching Enchantment Runes to raise their level.
+### Upgrade Table
+- **ID**: `machinery.upgrade_table`
+- **Structure**: Anvil on top of a Dropper on top of a Bookshelf.
+- **Used to**: Combine matching Enchantment Runes to raise their level.
 
-### 4. Block Duplicator
-- **Item ID**: `machinery.block_duplicator` (Reference item)
-- **Structure**: Nether Brick Fence on top of a Dropper surrounded horizontally (North, South, East, West) by Furnaces and/or Blast Furnaces.
-- **Description**: Expels a full stack of any valid building blocks placed inside the Dropper. Requires Lava Buckets as fuel (1 bucket per 2 stacks).
+### Block Duplicator
+- **ID**: `machinery.block_duplicator`
+- **Structure**: Nether Brick Fence on top of a Dropper surrounded horizontally by Furnaces/Blast Furnaces.
+- **Description**: Duplicates building blocks using Lava Buckets as fuel.
 
-### 5. Blood Altar
-- **Item ID**: `machinery.blood_altar` (Reference item)
-- **Structure**: Red Carpet on top of a Dropper on top of an Obsidian block.
-- **Description**: Used to perform dark sacrifice rituals (killing the player or reducing HP) to forge Demonium Runes.
+### Blood Altar
+- **ID**: `machinery.blood_altar`
+- **Structure**: Red Carpet on top of a Dropper on top of Obsidian.
+- **Used to**: Perform dark sacrifice rituals to forge Demonic Runes.
 
-### 6. Auto Sifter
-- **Item ID**: `machinery.auto_sifter` (Reference item)
+### Blessings Altar
+- **ID**: `machinery.blessings_altar`
+- **Structure**: 3x3 Gold Block platform surrounded by Quartz, with a Dropper and Fence.
+- **Used to**: Perform holy rituals to forge Holy Runes.
+
+### Heavy Alloy Forge
+- **ID**: `machinery.heavy_alloy_forge`
+- **Structure**: Blast Furnace on top of a Dropper on top of a 3x3 Magma Block base.
+- **Used to**: Smelt custom alloys.
+
+### Enchanter
+- **ID**: `machinery.enchanter`
+- **Structure**: Enchanting Table on top of a 3x3 Diamond Block base.
+- **Used to**: Enchant items using vanilla enchantments in exchange for Diamonds.
+
+### Disenchanter
+- **ID**: `machinery.disenchanter`
+- **Structure**: Enchanting Table on top of a 3x3 Iron Block base.
+- **Used to**: Remove enchantments from items and salvage materials.
+
+### Kinetic Crusher
+- **ID**: `machinery.kinetic_crusher`
+- **Structure**: Piston on top of a Hopper on top of a 3x3 Iron Block base.
+- **Used to**: Crush items (e.g. Ender Pearl -> Crushed Ender Dust).
+
+### Sifting Trommel
+- **ID**: `machinery.sifting_trommel`
+- **Structure**: Iron Bars surrounded by 4 Copper Blocks on top of a Hopper.
+- **Used to**: Sift materials for geode and mineral pieces.
+
+### Auto Sifter
+- **ID**: `machinery.auto_sifter`
 - **Structure**: Hopper on top of a Dropper adjacent to a Cauldron.
-- **Description**: Passively sifts Sand and Gravel inside the Dropper into raw resources every 5 seconds.
+- **Description**: Passively sifts Sand and Gravel into raw resources.
 
-### 7. Auto Smelter
-- **Item ID**: `machinery.auto_smelter` (Reference item)
+### Auto Smelter
+- **ID**: `machinery.auto_smelter`
 - **Structure**: Hopper on top of a Dropper adjacent to a Furnace.
-- **Description**: Passively smelts items inside the Dropper using fuel from its slot.
+- **Description**: Passively smelts items using fuel from its slot.
+
+### Wither Death Chest
+- **Structure**: A Chest with a Wither Skeleton Skull on top.
+- **Description**: Automatically collects inventory items upon death. One per player.
 
 ---
 
-## 🔮 Arcane Category
+## Arcane Category
 
-### 8. Lifesteal Rune I, II, III
-- **Item IDs**: `arcane.lifesteal_rune`, `arcane.lifesteal_rune_2`, `arcane.lifesteal_rune_3`
-- **Description**: Applied to swords via hand-swapping. On hit, heals the attacker for 15% / 30% / 45% of damage dealt.
+### Normal Runes
 
-### 9. Speed Rune I, II, III
-- **Item IDs**: `arcane.speed_rune`, `arcane.speed_rune_2`, `arcane.speed_rune_3`
-- **Description**: Applied to boots. Grants passive Speed I, II, or III while equipped.
+#### Vampiric Bleed I / II / III (Sword)
+- **IDs**: `arcane.lifesteal_rune`, `arcane.lifesteal_rune_2`, `arcane.lifesteal_rune_3`
+- **Effect**: Heals on attack (15%/30%/45% of damage dealt).
+- **Crafting**: Arcana Table. Upgrade via Upgrade Table.
 
-### 10. Catch Flame Rune I, II, III
-- **Item IDs**: `arcane.runes.catch_flame`, `arcane.runes.catch_flame_2`, `arcane.runes.catch_flame_3`
-- **Description**: Applied to weapons. Swords get Fire Aspect II, Bows get Flame I. Fires spread to nearby entities with 33% / 66% / 100% chance.
+#### Speed I / II / III (Boots)
+- **IDs**: `arcane.speed_rune`, `arcane.speed_rune_2`, `arcane.speed_rune_3`
+- **Effect**: Grants Speed I/II/III when worn.
+- **Crafting**: Arcana Table. Upgrade via Upgrade Table.
 
-### 11. Demonium Rune I, II, III
-- **Item IDs**: `arcane.runes.demonium`, `arcane.runes.demonium_2`, `arcane.runes.demonium_3`
-- **Description**: Applied to helmets. Passively ignites all entities in a 2-block radius (excluding the wearer) for 2s / 5s / 10s.
+#### Catch Flame I / II / III (Sword / Bow)
+- **IDs**: `arcane.runes.catch_flame`, `arcane.runes.catch_flame_2`, `arcane.runes.catch_flame_3`
+- **Effect**: Applies Fire Aspect II / Flame I. Spreads fire to nearby mobs (33%/66%/100%).
+- **Crafting**: Arcana Table. Upgrade via Upgrade Table.
 
-### 12. Corrosive Slash I, II, III, IV (Axe)
-- **Item ID**: `arcane.runes.corrosive_slash` (Levels 1-4)
-- **Description**: Melee attacks with axes reduce target armor toughness rating (stacks up to 5 times, expires in 15 seconds). Scales up to 10s duration at Level 4.
+#### Corrosive Slash I / II / III / IV (Axe)
+- **ID**: `arcane.runes.corrosive_slash` (Levels 1-4)
+- **Effect**: Reduces enemy armor toughness on axe hits (stacks up to 5, duration scales with level).
+- **Crafting**: Arcana Table.
 
-### 13. Scorch (Sword)
-- **Item ID**: `arcane.runes.scorch` (Level 1)
-- **Description**: Sword hits reduce enemy armor (stacks up to 10 times, max 90% reduction) and deal 1 tick of fire damage.
+#### Scorch (Sword)
+- **ID**: `arcane.runes.scorch` (Level 1)
+- **Effect**: Reduces enemy armor on hit (stacks up to 10, max 90%). Deals fire damage tick.
+- **Crafting**: Arcana Table.
 
-### 14. Glacial Thorns I, II, III, IV, V (Armor)
-- **Item ID**: `arcane.runes.glacial_thorns` (Levels 1-5)
-- **Description**: Attackers have a chance to be afflicted with Weakness. Level 5 guarantees Weakness II.
+#### Glacial Thorns I / II / III / IV / V (Armor)
+- **ID**: `arcane.runes.glacial_thorns` (Levels 1-5)
+- **Effect**: Attackers have a chance to be afflicted with Weakness. Level 5 guarantees Weakness II.
+- **Crafting**: Arcana Table.
 
-### 15. Tidal Sweep I, II, III (Swords)
-- **Item ID**: `arcane.runes.tidal_sweep` (Levels 1-3)
-- **Description**: Adds wider sweep damage. Incompatible with Sweeping Edge.
+#### Tidal Sweep I / II / III (Sword)
+- **ID**: `arcane.runes.tidal_sweep` (Levels 1-3)
+- **Effect**: Wider sweep attack with longer reach. Incompatible with Sweeping Edge.
+- **Crafting**: Arcana Table.
 
-### 16. Photosynthesis (Durability Gear)
-- **Item ID**: `arcane.runes.photosynthesis` (Level 1)
-- **Description**: Slowly repairs item durability while standing on dirt/grass under direct sunlight.
+#### Photosynthesis (Durability Gear)
+- **ID**: `arcane.runes.photosynthesis` (Level 1)
+- **Effect**: Slowly restores item durability while on dirt/grass under sunlight.
+- **Crafting**: Arcana Table.
 
-### 17. Artemis's Blessing (Bows)
-- **Item ID**: `arcane.runes.artemis_blessing` (Level 1)
-- **Description**: Silences bow shot sounds and adds +5 levels of Punch.
+#### Artemis's Blessing (Bow)
+- **ID**: `arcane.runes.artemis_blessing` (Level 1)
+- **Effect**: Silences bow shots and adds +5 levels of Punch.
+- **Crafting**: Arcana Table.
 
-### 18. Static Charge I, II, III, IV, V, VI, VII (Chestplate)
-- **Item ID**: `arcane.runes.static_charge` (Levels 1-7)
-- **Description**: Accumulates charge while moving. At 100%, next melee strike deals +25% bonus damage and releases electrical particles.
+#### Static Charge I / II / III / IV / V / VI / VII (Chestplate)
+- **ID**: `arcane.runes.static_charge` (Levels 1-7)
+- **Effect**: Generates charge while moving. Fully charged: next hit deals +25% damage.
+- **Crafting**: Arcana Table.
 
-### 19. Phantom Backstab I, II, III, IV (Swords)
-- **Item ID**: `arcane.runes.phantom_backstab` (Levels 1-4)
-- **Description**: Attacks have a 50% chance to summon a spectral sword behind the target that strikes for delayed damage after 1 second.
+#### Phantom Backstab I / II / III / IV (Sword)
+- **ID**: `arcane.runes.phantom_backstab` (Levels 1-4)
+- **Effect**: 50% chance to summon a spectral weapon copy behind the target that flies forward and strikes.
+- **Crafting**: Blood Altar.
 
-### 20. Bleed I, II, III, IV, V, VI, VII, VIII (Swords & Axes)
-- **Item ID**: `arcane.runes.bleed` (Levels 1-8)
-- **Description**: Applies ticking bleeding stacks on hit. Crafted on the Blood Altar.
+#### Bleed I / II / III / IV / V / VI / VII / VIII (Sword / Axe)
+- **ID**: `arcane.runes.bleed` (Levels 1-8)
+- **Effect**: Applies ticking bleeding stacks on melee hit.
+- **Crafting**: Blood Altar.
 
-### 21. Poison Spores I, II, III, IV, V (Swords & Axes)
-- **Item ID**: `arcane.runes.poison_spores` (Levels 1-5)
-- **Description**: Applies standard poison on hit.
+#### Poison Spores I / II / III / IV / V (Sword / Axe)
+- **ID**: `arcane.runes.poison_spores` (Levels 1-5)
+- **Effect**: Applies standard Poison on hit. Scales duration and proc chance.
+- **Crafting**: Arcana Table.
 
-### 22. Gas Cloud I, II, III, IV (Armor)
-- **Item ID**: `arcane.runes.gas_cloud` (Levels 1-4)
-- **Description**: Spawns a decay gas cloud on hit that deals ticking damage to entering enemies.
+#### Gas Cloud I / II / III / IV (Armor)
+- **ID**: `arcane.runes.gas_cloud` (Levels 1-4)
+- **Effect**: Chance to release decay gas cloud on hit.
+- **Crafting**: Arcana Table.
 
-### 23. Heavy Draw I, II, III, IV, V (Bows)
-- **Item ID**: `arcane.runes.heavy_draw` (Levels 1-5)
-- **Description**: Arrow draw time is increased by 50%, but final arrow damage is raised by up to +50%.
+#### Heavy Draw I / II / III / IV / V (Bow)
+- **ID**: `arcane.runes.heavy_draw` (Levels 1-5)
+- **Effect**: +50% draw time but up to +50% arrow damage.
+- **Crafting**: Arcana Table.
 
-### 24. Soul Harvester (Hoes)
-- **Item ID**: `arcane.runes.soul_harvester` (Level 1)
-- **Description**: Kills have a chance to drop Soul Orbs which yield experience.
+#### Soul Harvester (Hoe)
+- **ID**: `arcane.runes.soul_harvester` (Level 1)
+- **Effect**: Hoe kills have a chance to drop Soul Orbs granting massive XP.
+- **Crafting**: Arcana Table.
 
-### 25. Speed Boots
-- **Item ID**: `arcane.speed_boots`
-- **Description**: Diamond Boots pre-infused with the Speed I effect.
+#### Breach Surge (Sword / Axe)
+- **ID**: `arcane.runes.breach_surge` (Level 1)
+- **Effect**: 20% chance to release a homing energy projectile to a nearby target.
+- **Crafting**: Arcana Table.
 
-### 26. Shadow Cloak & Superior Shadow Cloak
-- **Item IDs**: `arcane.armor.shadow_cloak`, `arcane.armor.superior_shadow_cloak`
-- **Description**: Banner-based wearable cloaks. Grant invisibility, speed, and swift sneak under specific light conditions or when crouched.
+#### Rift Walk (Armor)
+- **ID**: `arcane.runes.rift_walk` (Level 1)
+- **Effect**: Double-tap sneak enters rift phase (invulnerable, cannot attack) for 5s.
+- **Crafting**: Arcana Table.
 
-### 27. Gale Chestplate
-- **Item ID**: `arcane.armor.gale_chestplate`
-- **Description**: Grants permanent Slow Falling I and allows double jumping.
+#### Vortex I / II / III (Sword)
+- **ID**: `arcane.runes.vortex` (Levels 1-3)
+- **Effect**: Sweeping strikes pull in mobs within 10 blocks.
+- **Crafting**: Arcana Table.
 
-### 28. Venomous Scythe
-- **Item ID**: `arcane.melee.venomous_scythe`
-- **Description**: Stacks poison on hit and deals bonus damage to poisoned mobs.
+#### Shrapnel Shot I / II / III (Crossbow)
+- **ID**: `arcane.runes.shrapnel_shot` (Levels 1-3)
+- **Effect**: Shoots a shotgun blast of 4-10 piercing arrows.
+- **Crafting**: Arcana Table.
 
-### 29. Siphon Blade
-- **Item ID**: `arcane.melee.siphon_blade`
-- **Description**: Restores 15% of your max health upon killing an enemy.
+### Demonic Runes
 
-### 30. Wand of Embers
-- **Item ID**: `arcane.wand_of_embers`
-- **Description**: Right-click to fire fireball projectiles.
+#### Demonium I / II / III (Helmet)
+- **IDs**: `arcane.runes.demonium`, `arcane.runes.demonium_2`, `arcane.runes.demonium_3`
+- **Effect**: Ignites all entities in a 2-block radius for 2s/5s/10s.
+- **Crafting**: Blood Altar.
 
-### 31. Staff of Supplant
-- **Item ID**: `arcane.ranged.staff_of_supplant`
-- **Description**: Projectile swaps positions of the player and the hit entity.
+#### Miasma (Bow)
+- **ID**: `arcane.runes.miasma` (Level 1)
+- **Effect**: Arrows detonate into a spore cloud shredding armor durability.
+- **Crafting**: Blood Altar.
 
-### 32. Wand of Transmutation
-- **Item ID**: `arcane.ranged.wand_of_transmutation`
-- **Description**: Beam turns hostile mobs into passive farm animals for 15s.
+#### Fenrir's Bite (Axe)
+- **ID**: `arcane.runes.fenrirs_bite` (Level 1)
+- **Effect**: Deals double damage to targets at full HP.
+- **Crafting**: Blood Altar.
 
-### 33. Wand of Levitation
-- **Item ID**: `arcane.ranged.wand_of_levitation`
-- **Description**: Projectile gives Levitation I for 5 seconds to targets.
+#### Anubis' Judgment (Sword)
+- **ID**: `arcane.runes.anubis_judgment` (Level 1)
+- **Effect**: Instantly executes targets below 20% HP, dropping double loot/XP.
+- **Crafting**: Blood Altar.
 
-### 34. Staff of the Stormlord
-- **Item ID**: `arcane.ranged.staff_of_the_stormlord`
-- **Description**: Strikes a lightning bolt on target block within 20 blocks.
+#### Gloom (Chestplate)
+- **ID**: `arcane.runes.gloom` (Level 1)
+- **Effect**: Slows nearby hostile mobs (5-block aura) and passively repairs armor durability on hit.
+- **Crafting**: Blood Altar.
 
-### 35. Amulet of the Phoenix
-- **Item ID**: `arcane.trinkets.amulet_of_the_phoenix`
-- **Description**: Resurrects player with a fire explosion. Has 3 charges before breaking.
+#### Cerberus' Maw (Axe)
+- **ID**: `arcane.runes.cerberus_maw` (Level 1)
+- **Effect**: Inflicts Bleed on cleave. Dying while bleeding drops a hunger-restoring blood orb.
+- **Crafting**: Blood Altar.
 
-### 36. Totem of Fallacy
-- **Item ID**: `arcane.trinkets.totem_of_fallacy`
-- **Description**: Teleports you to spawn at the cost of reducing all inventory items' durability to 10%.
+#### Styx's Toll (Bow)
+- **ID**: `arcane.runes.styxs_toll` (Level 1)
+- **Effect**: Roots hit targets for 3 seconds.
+- **Crafting**: Blood Altar.
 
-### 37. Frostbite Ring
-- **Item ID**: `arcane.trinkets.frostbite_ring`
-- **Description**: Freezes water under your feet; extinguishes burning entities on hit.
+#### Infernalis I / II (Chestplate)
+- **ID**: `arcane.runes.infernalis` (Levels 1-2)
+- **Effect**: Permanently ablaze, immune to fire/lava. Melee attacks gain +20% fire damage.
+- **Crafting**: Blood Altar.
 
-### 38. Stormcaller Medallion
-- **Item ID**: `arcane.trinkets.stormcaller_medallion`
-- **Description**: Gives a 15% chance to strike lightning on hit during storms.
+#### Remedium (Sword)
+- **ID**: `arcane.runes.remedium` (Level 1)
+- **Effect**: Sneak right-click consumes 50% HP to purge debuffs and grant Strength II.
+- **Crafting**: Blood Altar.
 
-### 39. Vitality Geode I, II, III
-- **Item IDs**: `arcane.trinkets.vitality_geode_1`, `arcane.trinkets.vitality_geode_2`, `arcane.trinkets.vitality_geode_3`
-- **Description**: Passively increases maximum health by +4 / +10 / +20 while held in inventory.
+#### Brimstone I / II (Bow / Crossbow)
+- **ID**: `arcane.runes.brimstone` (Levels 1-2)
+- **Effect**: Projectiles explode into burning ash inflicting Wither and Slowness.
+- **Crafting**: Blood Altar.
+
+#### Ashen Veil (Armor)
+- **ID**: `arcane.runes.ashen_veil` (Level 1)
+- **Effect**: Crouching leaves a trail of blinding/suffocating smoke.
+- **Crafting**: Blood Altar.
+
+### Holy Runes
+
+#### Warding Halo (Chestplate)
+- **ID**: `arcane.runes.warding_halo` (Level 1)
+- **Effect**: Grants rings that nullify the next 3 incoming attacks.
+- **Crafting**: Blessings Altar.
+
+#### Apollo's Ray (Bow)
+- **ID**: `arcane.runes.apollos_ray` (Level 1)
+- **Effect**: Fully drawn arrows become hitscan light beams inflicting holy fire.
+- **Crafting**: Blessings Altar.
+
+#### Trinity's Well (Bow)
+- **ID**: `arcane.runes.trinitys_well` (Level 1)
+- **Effect**: Shooting allies heals; shooting enemies marks them for health-leech on melee hit.
+- **Crafting**: Blessings Altar.
+
+#### Valkyrie's Grace (Armor)
+- **ID**: `arcane.runes.valkyries_grace` (Level 1)
+- **Effect**: Fatal damage triggers knockback and grants Regeneration III / Resistance II.
+- **Crafting**: Blessings Altar.
+
+#### Smite of Jupiter (Sword)
+- **ID**: `arcane.runes.smite_of_jupiter` (Level 1)
+- **Effect**: Fully charged sweep attack calls silent lightning. Double damage vs Undead.
+- **Crafting**: Blessings Altar.
+
+### Armor
+
+#### Speed Boots
+- **ID**: `arcane.speed_boots`
+- **Description**: Diamond Boots pre-infused with Speed Rune I.
+
+#### Shadow Cloak
+- **ID**: `arcane.armor.shadow_cloak`
+- **Description**: Invisibility and Speed I when light level < 7.
+
+#### Superior Shadow Cloak
+- **ID**: `arcane.armor.superior_shadow_cloak`
+- **Description**: Upgraded. Invisibility + Speed II + Swift Sneak while crouched.
+
+#### Gale Chestplate
+- **ID**: `arcane.armor.gale_chestplate`
+- **Description**: Permanent Slow Falling I + double jumping.
+
+#### Storm-Weaver Armor Set
+- **IDs**: `arcane.armor.storm_weaver.{helmet,chestplate,leggings,boots}`
+- **Description**: Mage armor. Set bonus: Speed II, Jump Boost II, lightning immunity, lightning on hit.
+
+### Melee Weapons
+
+#### Venomous Scythe
+- **ID**: `arcane.melee.venomous_scythe`
+- **Description**: Stacks poison on hit, deals bonus damage to poisoned targets.
+
+#### Siphon Blade
+- **ID**: `arcane.melee.siphon_blade`
+- **Description**: Restores 15% max HP on killing an enemy.
+
+### Ranged Weapons
+
+#### Wand of Embers
+- **ID**: `arcane.wand_of_embers`
+- **Description**: Fires fireball projectiles on right-click.
+
+#### Staff of Supplant
+- **ID**: `arcane.ranged.staff_of_supplant`
+- **Description**: Projectile swaps positions with the hit entity.
+
+#### Wand of Transmutation
+- **ID**: `arcane.ranged.wand_of_transmutation`
+- **Description**: Beam turns hostile mobs into passive animals for 15s.
+
+#### Wand of Levitation
+- **ID**: `arcane.ranged.wand_of_levitation`
+- **Description**: Projectile gives Levitation I for 5s.
+
+#### Staff of the Stormlord
+- **ID**: `arcane.ranged.staff_of_the_stormlord`
+- **Description**: Calls lightning on target block within 20 blocks.
+
+#### Tome of Glintblade Phalanx
+- **ID**: `arcane.tomes.glintblade_phalanx`
+- **Description**: Summons 4 floating phantom swords that orbit and home to targets.
+
+### Trinkets
+
+#### Amulet of the Phoenix
+- **ID**: `arcane.trinkets.amulet_of_the_phoenix`
+- **Description**: Resurrects with fire explosion. 3 charges before breaking.
+
+#### Totem of Fallacy
+- **ID**: `arcane.trinkets.totem_of_fallacy`
+- **Description**: Teleports to spawn; reduces inventory item durability to 10%.
+
+#### Frostbite Ring
+- **ID**: `arcane.trinkets.frostbite_ring`
+- **Description**: Freezes water under feet; extinguishes burning entities on hit.
+
+#### Stormcaller Medallion
+- **ID**: `arcane.trinkets.stormcaller_medallion`
+- **Description**: 15% lightning strike chance on hit during storms.
+
+#### Vitality Geode I / II / III
+- **IDs**: `arcane.trinkets.vitality_geode_{1,2,3}`
+- **Description**: Increases max HP by +4 / +10 / +20 while in inventory.
+
+### Materials & Ingredients
+
+- **Ender Essence** (`arcane.materials.ender_essence`): Compressed ender magic.
+- **Potent Spider Web** (`arcane.materials.potent_spider_web`): Sticky web compound.
+- **Hardened Coal I / II / Max** (`arcane.materials.hardened_coal_{1,2,max}`): Pressurized coal.
+- **Hardened Base I / II / Max** (`arcane.materials.hardened_base_{1,2,max}`): Compressed clay-copper.
+- **Synthetic Diamond** (`arcane.materials.synthetic_diamond`): Artificial diamond.
+- **Synthetic Emerald** (`arcane.materials.synthetic_emerald`): Artificial emerald.
+- **Echoing Core** (`arcane.materials.echoing_core`): Resonating deep-sea core.
+- **Immolation Totem** (`arcane.materials.immolation_totem`): Volatile fire reagent.
+- **Nature's Embrace** (`arcane.materials.natures_embrace`): Green orb of forest power.
+- **Sun's Brilliance** (`arcane.materials.suns_brilliance`): Solar-infused flower.
+- **Empty Vial** (`arcane.materials.empty_vial`): Glass container for blood.
+- **Blood** (`arcane.materials.blood`): Player blood.
+- **Poison Vial** (`arcane.materials.poison_vial`): Concentrated venom.
+- **Soul Orb** (`arcane.materials.soul_orb`): Drops from mobs, grants XP.
+- **Lightning Essence** (`arcane.materials.lightning_essence`): Trace of lightning.
+- **Link Stone** (`arcane.materials.link_stone`): Crystal binding agent.
+- **Transmutation Core** (`arcane.materials.transmutation_core`): Pulsing matter-changing core.
+- **Core of Heat** (`explorer.materials.core_of_heat`): Hot orb of compressed magma.
+- **Resonant Plate** (`explorer.materials.resonant_plate`): Elastic force-reflecting plate.
+- **Blessing of the Void** (`explorer.materials.blessing_of_the_void`): Ender-encased elytra.
+- **Blue Gold** (`arcane.materials.blue_gold`): Gold-iron alloy.
+- **Rose Gold** (`arcane.materials.rose_gold`): Copper-gold alloy.
+- **Bronzed Steel** (`arcane.materials.bronzed_steel`): Copper-iron steel.
+- **Abyssal Alloy** (`arcane.materials.abyssal_alloy`): Blood-infused nether alloy.
+- **Crushed Ender Dust** (`arcane.materials.crushed_ender_dust`): Fine ender powder.
+- **Fractured Geode** (`arcane.materials.fractured_geode`): Cracked mineral shell.
 
 ---
 
-## 🧭 Exploration Category
+## Explorer Category
 
-### 40. Dwarf's Blessing (Tools)
-- **Item ID**: `explorer.runes.dwarfs_blessing` (Level 1)
-- **Description**: Automatically smelts mined blocks. Breaks logs into charcoal.
+### Normal Runes
 
-### 41. Seismic Landing I, II, III, IV (Boots)
-- **Item ID**: `explorer.runes.seismic_landing` (Levels 1-4)
-- **Description**: Negates fall damage up to 5 hearts, releasing a damage shockwave. Incompatible with Feather Falling.
+#### Dwarf's Blessing (Tools)
+- **ID**: `explorer.runes.dwarfs_blessing` (Level 1)
+- **Effect**: Auto-smelts mined blocks. Logs drop Charcoal.
+- **Crafting**: Heavy Forge.
 
-### 42. Zephyr (Bows/Crossbows)
-- **Item ID**: `explorer.runes.zephyr` (Level 1)
-- **Description**: Removes gravity influence from arrows.
+#### Seismic Landing I / II / III / IV (Boots)
+- **ID**: `explorer.runes.seismic_landing` (Levels 1-4)
+- **Effect**: Negates fall damage (up to 5 hearts), releases damage shockwave. Incompatible with Feather Falling.
+- **Crafting**: Heavy Forge.
 
-### 43. Telekinesis (Tools)
-- **Item ID**: `explorer.runes.telekinesis` (Level 1)
-- **Description**: Teleports block drops and XP directly to player inventory.
+#### Zephyr (Bow / Crossbow)
+- **ID**: `explorer.runes.zephyr` (Level 1)
+- **Effect**: Removes arrow gravity.
+- **Crafting**: Heavy Forge.
 
-### 44. Kinetic Rebound (Shields)
-- **Item ID**: `explorer.runes.kinetic_rebound` (Level 1)
-- **Description**: High chance to reflect blocked projectiles back at shooters.
+#### Telekinesis (Tools)
+- **ID**: `explorer.runes.telekinesis` (Level 1)
+- **Effect**: Teleports mined blocks and XP to inventory.
+- **Crafting**: Heavy Forge.
 
-### 45. Timber (Axes)
-- **Item ID**: `explorer.runes.timber` (Level 1)
-- **Description**: Breaks entire contiguous tree structures when a single log is broken.
+#### Kinetic Rebound (Shield)
+- **ID**: `explorer.runes.kinetic_rebound` (Level 1)
+- **Effect**: High chance to reflect blocked projectiles.
+- **Crafting**: Heavy Forge.
 
-### 46. Crude Sharpness I, II, III, IV, V, VI, VII (Tools & Sticks)
-- **Item ID**: `explorer.runes.crude_sharpness` (Levels 1-7)
-- **Description**: Adds flat melee damage boost.
+#### Timber (Axe)
+- **ID**: `explorer.runes.timber` (Level 1)
+- **Effect**: Breaks entire trees when one log is broken.
+- **Crafting**: Heavy Forge.
 
-### 47. Basalt Trail (Boots)
-- **Item ID**: `explorer.runes.basalt_trail` (Level 1)
-- **Description**: Cools lava beneath feet into temporary basalt.
+#### Crude Sharpness I / II / III / IV / V / VI / VII (Tools / Stick)
+- **ID**: `explorer.runes.crude_sharpness` (Levels 1-7)
+- **Effect**: Flat melee damage boost to all tools and sticks.
+- **Crafting**: Heavy Forge.
 
-### 48. Void Walker (Boots)
-- **Item ID**: `explorer.runes.void_walker` (Level 1)
-- **Description**: Rescues player back to safe ground if they fall into the void.
+#### Basalt Trail (Boots)
+- **ID**: `explorer.runes.basalt_trail` (Level 1)
+- **Effect**: Cools lava beneath feet into temporary Basalt.
+- **Crafting**: Heavy Forge.
 
-### 49. Waypoint Compass
-- **Item ID**: `explorer.waypoint_compass`
-- **Description**: Coordinates linker that teleports player to waypoint on right-click.
+#### Void Walker (Boots)
+- **ID**: `explorer.runes.void_walker` (Level 1)
+- **Effect**: Teleports you to safety if you fall 20+ blocks into the void.
+- **Crafting**: Heavy Forge.
 
-### 50. Waypoint Teleport Plate
-- **Item ID**: `explorer.navigation.teleportation_plate`
-- **Description**: Pressure plate linked with a Waypoint Compass to teleport players on step.
+#### Aegis Guard (Shield)
+- **ID**: `explorer.runes.aegis_guard` (Level 1)
+- **Effect**: Blocking grants Resistance II and Regeneration I for 4s.
+- **Crafting**: Heavy Forge.
 
-### 51. Ore Scanner
-- **Item ID**: `explorer.exploration.ore_scanner`
-- **Description**: Right-click to highlight nearby ores (Diamond, Gold, Iron) with particles.
+#### Mach Rush (Boots)
+- **ID**: `explorer.runes.mach_rush` (Level 1)
+- **Effect**: Sprinting builds speed multiplier. Resets on stop/jump/swing.
+- **Crafting**: Heavy Forge.
 
-### 52. Grappling Hooks (Iron, Diamond, Netherite)
-- **Item IDs**: `explorer.grappling_hook.iron`, `explorer.grappling_hook.diamond`, `explorer.grappling_hook.netherite`
-- **Description**: Lead-based grapple hooks with ranges of 10 / 25 / 50 blocks.
+#### Daedalus' Touch (Pickaxe)
+- **ID**: `explorer.runes.daedalus_touch` (Level 1)
+- **Effect**: Sneak-mining vein-mines up to 16 connected blocks.
+- **Crafting**: Heavy Forge.
 
-### 53. Webber
-- **Item ID**: `explorer.tools.webber`
-- **Description**: Crossbow-like tool that fires temporary cobwebs.
+#### Ouroboros (Shield)
+- **ID**: `explorer.runes.ouroboros` (Level 1)
+- **Effect**: Shield never breaks; at 0 durability consumes Ender Essence to repair.
+- **Crafting**: Heavy Forge.
 
-### 54. Web Slingers (Iron, Diamond, Netherite)
-- **Item IDs**: `explorer.tools.web_slinger.iron`, `explorer.tools.web_slinger.diamond`, `explorer.tools.web_slinger.netherite`
-- **Description**: Grappling Hooks upgraded to place temporary safety webs when landing.
+#### Resonance Ping (Pickaxe)
+- **ID**: `explorer.runes.resonance_ping` (Level 1)
+- **Effect**: Sneaking outlines valuable ores within 10 blocks for 2s.
+- **Crafting**: Heavy Forge.
 
-### 55. Thermal Canteen
-- **Item ID**: `explorer.gadgets.thermal_canteen`
-- **Description**: Stores up to 4 charges of campfire heat/lava. Restores hunger and cures effects.
+#### Naiad's Repel (Armor)
+- **ID**: `explorer.runes.naiads_repel` (Level 1)
+- **Effect**: Creates 3x3 pocket of breathable air when submerged.
+- **Crafting**: Heavy Forge.
 
-### 56. Beastmaster's Flute
-- **Item ID**: `explorer.tools.beastmasters_flute`
-- **Description**: pacifies hostile mobs in a 5-block radius for a short duration.
+### Holy Runes
 
-### 57. Excavation Drill
-- **Item ID**: `explorer.tools.excavation_drill`
-- **Description**: Mining tool that breaks blocks in a 3x3 pattern.
+#### Hermes' Tread (Boots)
+- **ID**: `explorer.runes.hermes_tread` (Level 1)
+- **Effect**: Permanent Speed II and auto step-up.
+- **Crafting**: Blessings Altar.
 
-### 58. Ender Backpack
-- **Item ID**: `explorer.gadgets.ender_backpack`
-- **Description**: Opens ender chest storage remotely.
+#### Radial Blind (Shield)
+- **ID**: `explorer.runes.radial_blind` (Level 1)
+- **Effect**: Blocking heavy attacks blinds/slows mobs within 8 blocks.
+- **Crafting**: Blessings Altar.
 
-### 59. Safari Lasso
-- **Item ID**: `explorer.gadgets.safari_lasso`
-- **Description**: Captures passive mobs into the item, and spawns them back with saved states.
+#### Hallowed Ground (Boots)
+- **ID**: `explorer.runes.hallowed_ground` (Level 1)
+- **Effect**: Walking creates holy fire trail that damages Undead.
+- **Crafting**: Blessings Altar.
 
-### 60. Void Bag
-- **Item ID**: `explorer.gadgets.void_bag`
-- **Description**: Opens virtual 9-slot inventory that deletes all items inside upon closing.
+### Navigation
 
-### 61. Steam Jetpack
-- **Item ID**: `explorer.armor.steam_jetpack`
-- **Description**: Sneak in mid-air to receive thruster boost. Fueled by coal.
+#### Waypoint Compass
+- **ID**: `explorer.waypoint_compass`
+- **Description**: Links to a waypoint and teleports on right-click.
 
-### 62. Bottle of Lightning
-- **Item ID**: `explorer.gadgets.bottle_of_lightning`
-- **Description**: A bottle filled with electrical energy. Used to craft staff of stormlord.
+#### Waypoint Teleport Plate
+- **ID**: `explorer.navigation.teleportation_plate`
+- **Description**: Pressure plate linked with a Waypoint Compass. Teleports players standing on it.
 
-### 63. Magnetic Ring
-- **Item ID**: `explorer.gadgets.magnetic_ring`
-- **Description**: Pulls dropped items within 5 blocks towards the player.
+### Exploration
 
-### 64. Portable Utility Screens
-- **Item IDs**: 
-  - `explorer.tools.portable_smelter`
-  - `explorer.tools.portable_furnace`
-  - `explorer.tools.portable_crafting_table`
-  - `explorer.tools.portable_anvil`
-  - `explorer.tools.portable_smithing_table`
-  - `explorer.tools.portable_grindstone`
-  - `explorer.tools.portable_stonecutter`
-- **Description**: Access work block screens directly from inventory anywhere.
+#### Ore Scanner
+- **ID**: `explorer.exploration.ore_scanner`
+- **Description**: Highlights nearby valuable ores in a 10-block radius.
 
----
+#### Structure Locators
+- **IDs**: `explorer.tools.locator.{village,stronghold,end_city}`
+- **Description**: 10-charge locators for specific structures.
 
-## 🧬 Custom Materials & Reagents
+#### Omni Tool
+- **ID**: `explorer.tools.omni_tool`
+- **Description**: Adapts its form to harvest whatever block you look at.
 
-### 65. Ender Essence
-- **Item ID**: `arcane.materials.ender_essence`
-- **Description**: Crafting material made of 9 Ender Pearls.
+### Gadgets
 
-### 66. Potent Spider Web
-- **Item ID**: `arcane.materials.potent_spider_web`
-- **Description**: Highly sticky cobweb compound.
+#### Grappling Hooks (Iron / Diamond / Netherite)
+- **IDs**: `explorer.grappling_hook.{iron,diamond,netherite}`
+- **Description**: Ranges of 10 / 25 / 50 blocks.
 
-### 67. Hardened Coal I, II, Max
-- **Item IDs**: `arcane.materials.hardened_coal_1`, `arcane.materials.hardened_coal_2`, `arcane.materials.hardened_coal_max`
-- **Description**: Pressurized coal grades.
+#### Web Slingers (Iron / Diamond / Netherite)
+- **IDs**: `explorer.tools.web_slinger.{iron,diamond,netherite}`
+- **Description**: Grappling Hooks upgraded to place safety webs on landing.
 
-### 68. Hardened Base I, II, Max
-- **Item IDs**: `arcane.materials.hardened_base_1`, `arcane.materials.hardened_base_2`, `arcane.materials.hardened_base_max`
-- **Description**: Compressed clay-copper reagents.
+#### Thermal Canteen
+- **ID**: `explorer.gadgets.thermal_canteen`
+- **Description**: 4 charges; restores hunger and cures effects.
 
-### 69. Synthetic Diamond & Synthetic Emerald
-- **Item IDs**: `arcane.materials.synthetic_diamond`, `arcane.materials.synthetic_emerald`
-- **Description**: Forged gemstones.
+#### Ender Backpack
+- **ID**: `explorer.gadgets.ender_backpack`
+- **Description**: Opens ender chest remotely.
 
-### 70. Echoing Core
-- **Item ID**: `arcane.materials.echoing_core`
-- **Description**: Resonating deep-sea core.
+#### Safari Lasso
+- **ID**: `explorer.gadgets.safari_lasso`
+- **Description**: Captures and releases passive mobs.
 
-### 71. Immolation Totem
-- **Item ID**: `arcane.materials.immolation_totem`
-- **Description**: Heat reagent made with Gold and Lava Buckets.
+#### Void Bag
+- **ID**: `explorer.gadgets.void_bag`
+- **Description**: Virtual trash inventory; items vanish on close.
 
-### 72. Nature's Embrace
-- **Item ID**: `arcane.materials.natures_embrace`
-- **Description**: Green orb crafted by surrounding a Heart of the Sea with 8 leaf types.
+#### Bottle of Lightning
+- **ID**: `explorer.gadgets.bottle_of_lightning`
+- **Description**: Electrical energy source used in storm staff crafting.
 
-### 73. Sun's Brilliance
-- **Item ID**: `arcane.materials.suns_brilliance`
-- **Description**: Solar-infused flower made by letting an Immolation Totem sit on the ground under direct sunlight for 10s.
+#### Depth Strider Flippers
+- **ID**: `explorer.gadgets.depth_strider_flippers`
+- **Description**: Swim speed + water breathing; Slowness on land.
 
-### 74. Blessing of the Void
-- **Item ID**: `explorer.materials.blessing_of_the_void`
-- **Description**: Ender-encased Elytra ingredient.
+#### Slime Boots
+- **ID**: `explorer.gadgets.slime_boots`
+- **Description**: Negates fall damage and bounces upward.
 
-### 75. Resonant Plate
-- **Item ID**: `explorer.materials.resonant_plate`
-- **Description**: Force-absorbing metal plate.
+#### Magnetic Ring
+- **ID**: `explorer.gadgets.magnetic_ring`
+- **Description**: Pulls dropped items within 5 blocks toward you.
 
-### 76. Link Stone
-- **Item ID**: `arcane.materials.link_stone`
-- **Description**: Crystal binding agent used to craft Redirection.
+### Tools
 
-### 77. Empty Vial & Blood
-- **Item IDs**: `arcane.materials.empty_vial`, `arcane.materials.blood`
-- **Description**: Containers for extracting and storing player blood.
+#### Webber
+- **ID**: `explorer.tools.webber`
+- **Description**: Fires temporary cobwebs (5s duration).
 
-### 78. Poison Vial
-- **Item ID**: `arcane.materials.poison_vial`
-- **Description**: Extracted spider/pufferfish venom.
+#### Beastmaster's Flute
+- **ID**: `explorer.tools.beastmasters_flute`
+- **Description**: Pacifies hostiles in a 5-block radius. 60s cooldown.
 
-### 79. Soul Orb
-- **Item ID**: `arcane.materials.soul_orb`
-- **Description**: Floating soul that drops from mobs and yields XP on consumption.
+#### Excavation Drill
+- **ID**: `explorer.tools.excavation_drill`
+- **Description**: 3x3 block-breaking pickaxe.
 
-### 80. Core of Heat
-- **Item ID**: `explorer.materials.core_of_heat`
-- **Description**: Hot orb forged from Magma Blocks and Blaze Powder.
+#### Builder's Wand
+- **ID**: `explorer.tools.builders_wand`
+- **Description**: Places up to 9 blocks in a line.
 
-### 81. Lightning Essence
-- **Item ID**: `arcane.materials.lightning_essence`
-- **Description**: Rare trace element dropped from mobs struck by natural lightning.
+#### Portable Utility Screens
+- **IDs**: `explorer.tools.portable_{smelter,furnace,crafting_table,anvil,smithing_table,grindstone,stonecutter}`
+- **Description**: Access work block screens from inventory anywhere.
+
+### Armor
+
+#### Spelunker's Helmet
+- **ID**: `explorer.armor.spelunkers_helmet`
+- **Description**: Night Vision + highlights hostile mobs with Glowing.
+
+#### Steam Jetpack
+- **ID**: `explorer.armor.steam_jetpack`
+- **Description**: Sneak mid-air for thruster boost. Fueled by coal.
+
+#### Webbed Armor Set
+- **IDs**: `explorer.armor.webbed.{helmet,chestplate,leggings,boots}`
+- **Description**: Chainmail stats. Full set: climb vertical walls.
+
+#### Aegis Vanguard Armor Set
+- **IDs**: `explorer.armor.aegis_vanguard.{helmet,chestplate,leggings,boots}`
+- **Description**: Tank armor. Full set: Slowness I, Resistance II, mob-taunt shockwave.

@@ -1,4 +1,4 @@
-package space.qclid.dashboard.codex;
+package space.qclid.dashboard.codex.core;
 
 import java.util.ArrayList;
 import java.util.Collections;

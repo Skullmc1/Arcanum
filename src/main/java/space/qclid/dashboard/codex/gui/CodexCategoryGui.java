@@ -9,7 +9,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import net.kyori.adventure.text.Component;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
-import space.qclid.dashboard.codex.*;
+import space.qclid.dashboard.codex.core.CodexCategory;
+import space.qclid.dashboard.codex.core.CodexItem;
+import space.qclid.dashboard.codex.core.CodexManager;
+import space.qclid.dashboard.codex.core.CodexRegistry;
+import space.qclid.dashboard.codex.core.CodexInventoryHolder;
 
 import java.util.ArrayList;
 import java.util.List;
