@@ -2692,11 +2692,8 @@ public class CodexFeature {
                     if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
                     giveCodex(player);
                     return 1;
-                }).build(), "Receive the Codex guide book", List.of());
-
-        // ── /codex wiki — browsable in-game item catalog ───────────────────────
-        commands.register(Commands.literal("codex")
-            .then(Commands.literal("wiki")
+                })
+                .then(Commands.literal("wiki")
                 .executes(ctx -> {
                     if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
                     showWikiCategories(player);
@@ -2757,7 +2754,7 @@ public class CodexFeature {
                         )
                     )
                 )
-            ).build(), "Browse the Codex item catalog in-game", List.of("wiki"));
+            ).build(), "Receive the Codex guide book", List.of("wiki"));
 
         commands.register(Commands.literal("codexitem")
                 .executes(ctx -> {
