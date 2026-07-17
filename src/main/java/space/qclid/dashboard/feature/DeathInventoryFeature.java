@@ -136,7 +136,7 @@ public class DeathInventoryFeature implements Listener {
 
                 // Register new death chest
                 settings.deathChest = below.getLocation();
-                data.save();
+                data.save(player.getUniqueId());
                 player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Death Chest registered successfully at ") 
                         + C_GOLD + below.getX() + ", " + below.getY() + ", " + below.getZ() + "!"));
                 player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.5f, 1.5f);
@@ -178,7 +178,7 @@ public class DeathInventoryFeature implements Listener {
             PlayerSettings s = entry.getValue();
             if (s.deathChest != null && s.deathChest.equals(checkLoc)) {
                 s.deathChest = null;
-                data.save();
+                data.save(entry.getKey());
 
                 Player owner = Bukkit.getPlayer(entry.getKey());
                 if (owner != null && owner.isOnline()) {

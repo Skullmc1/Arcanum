@@ -45,12 +45,19 @@ public final class TextUtil {
     /** Converts a string to Unicode small-caps characters. */
     public static String toSmallCaps(String input) {
         if (input == null) return "";
-        String normal = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        String small  = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀѕᴛᴜᴠᴡхʏᴢᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀѕᴛᴜᴠᴡхʏᴢ";
+        String normalLower = "abcdefghijklmnopqrstuvwxyz";
+        String normalUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        String smallLower  = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀѕᴛᴜᴠᴡхʏᴢ";
+        String smallUpper  = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀѕᴛᴜᴠᴡхʏᴢ";
         StringBuilder result = new StringBuilder();
         for (char c : input.toCharArray()) {
-            int index = normal.indexOf(c);
-            result.append(index != -1 ? small.charAt(index) : c);
+            int idx = normalLower.indexOf(c);
+            if (idx != -1) {
+                result.append(smallLower.charAt(idx));
+                continue;
+            }
+            idx = normalUpper.indexOf(c);
+            result.append(idx != -1 ? smallUpper.charAt(idx) : c);
         }
         return result.toString();
     }

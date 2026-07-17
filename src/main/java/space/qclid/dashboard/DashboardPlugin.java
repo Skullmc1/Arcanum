@@ -63,21 +63,19 @@ public class DashboardPlugin extends JavaPlugin {
         getServer().getGlobalRegionScheduler().runAtFixedRate(this,
             task -> updateFeature.checkForUpdates(null, true), 1L, 6000L);
 
-        // Keep a reference for onDisable
-        this.getServer().getPluginManager().getPlugin("Dashboard"); // no-op; refs held in lambdas above
         // Store as fields for onDisable access
-        _dataManager    = dataManager;
-        _updateFeature  = updateFeature;
+        this.dataManager    = dataManager;
+        this.updateFeature  = updateFeature;
     }
 
     // Held purely so onDisable can call save/shutdown
-    private DataManager   _dataManager;
-    private UpdateFeature _updateFeature;
+    private DataManager   dataManager;
+    private UpdateFeature updateFeature;
 
     @Override
     public void onDisable() {
-        if (_dataManager   != null) _dataManager.save();
-        if (_updateFeature != null) _updateFeature.onShutdown();
+        if (dataManager   != null) dataManager.save();
+        if (updateFeature != null) updateFeature.onShutdown();
         getLogger().info("Dashboard disabled.");
     }
 }

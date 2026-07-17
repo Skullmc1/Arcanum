@@ -8,9 +8,11 @@ import space.qclid.dashboard.PlayerSettings;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -20,6 +22,8 @@ public class DataManager {
 
     private final JavaPlugin plugin;
     private final Map<UUID, PlayerSettings> playerSettings = new HashMap<>();
+    private final Set<UUID> dirtyPlayers = new HashSet<>();
+    private int saveCounter = 0;
     public final Map<String, org.bukkit.Location> teleportPlates = new HashMap<>();
 
     public DataManager(JavaPlugin plugin) {
@@ -44,39 +48,103 @@ public class DataManager {
         return playerSettings;
     }
 
+    /** Marks a player's settings as dirty (needs saving). */
+    public void markDirty(UUID uuid) {
+        dirtyPlayers.add(uuid);
+    }
+
+    /** Marks teleport plates as dirty (needs saving). */
+    public void markPlatesDirty() {
+        dirtyPlayers.add(null); // sentinel: null key means teleport plates changed
+    }
+
+    /** Save a single player's settings. */
+    public void save(UUID uuid) {
+        markDirty(uuid);
+        save();
+    }
+
     // ── Persistence ───────────────────────────────────────────────────────────
 
     public void save() {
         File file = new File(plugin.getDataFolder(), "data.yml");
-        YamlConfiguration config = new YamlConfiguration();
+        YamlConfiguration config;
 
-        for (Map.Entry<UUID, PlayerSettings> entry : playerSettings.entrySet()) {
-            String uuid = entry.getKey().toString();
-            PlayerSettings s = entry.getValue();
+        // Load existing data to merge with (read once, re-use)
+        if (file.exists()) {
+            config = YamlConfiguration.loadConfiguration(file);
+        } else {
+            config = new YamlConfiguration();
+        }
 
-            config.set(uuid + ".showXyz",       s.showXyz);
-            config.set(uuid + ".showBiome",      s.showBiome);
-            config.set(uuid + ".showNetherXyz",  s.showNetherXyz);
-            config.set(uuid + ".globalEnabled",  s.globalEnabled);
-
-            if (s.linkedChest != null) config.set(uuid + ".linkedChest", s.linkedChest);
-            if (s.deathChest  != null) config.set(uuid + ".deathChest",  s.deathChest);
-            if (s.deathItems  != null) config.set(uuid + ".deathItems",  Arrays.asList(s.deathItems));
-
+        // Serialize dirty players only
+        for (UUID uuid : dirtyPlayers) {
+            if (uuid == null) continue; // skip sentinel
+            PlayerSettings s = playerSettings.get(uuid);
+            if (s == null) continue;
+            String key = uuid.toString();
+            config.set(key + ".showXyz",       s.showXyz);
+            config.set(key + ".showBiome",      s.showBiome);
+            config.set(key + ".showNetherXyz",  s.showNetherXyz);
+            config.set(key + ".globalEnabled",  s.globalEnabled);
+            if (s.linkedChest != null) config.set(key + ".linkedChest", s.linkedChest);
+            if (s.deathChest  != null) config.set(key + ".deathChest",  s.deathChest);
+            if (s.deathItems  != null) config.set(key + ".deathItems",  Arrays.asList(s.deathItems));
             if (!s.waypoints.isEmpty()) {
                 for (Map.Entry<String, org.bukkit.Location> wp : s.waypoints.entrySet()) {
-                    config.set(uuid + ".waypoints." + wp.getKey(), wp.getValue());
+                    config.set(key + ".waypoints." + wp.getKey(), wp.getValue());
                 }
             }
         }
 
-        if (!teleportPlates.isEmpty()) {
+        // Serialize teleport plates if dirty (sentinel null key)
+        if (dirtyPlayers.contains(null) && !teleportPlates.isEmpty()) {
             for (Map.Entry<String, org.bukkit.Location> entry : teleportPlates.entrySet()) {
                 config.set("teleportPlates." + entry.getKey().replace(".", "[dot]"), entry.getValue());
             }
         }
 
         try {
+            config.save(file);
+        } catch (Exception e) {
+            plugin.getLogger().severe("Could not save data.yml: " + e.getMessage());
+        }
+
+        // Full save every 10 saves to clean stale entries
+        saveCounter++;
+        if (saveCounter >= 10) {
+            saveCounter = 0;
+            fullSave();
+        }
+
+        dirtyPlayers.clear();
+    }
+
+    private void fullSave() {
+        try {
+            File file = new File(plugin.getDataFolder(), "data.yml");
+            YamlConfiguration config = new YamlConfiguration();
+            for (Map.Entry<UUID, PlayerSettings> entry : playerSettings.entrySet()) {
+                String key = entry.getKey().toString();
+                PlayerSettings s = entry.getValue();
+                config.set(key + ".showXyz",       s.showXyz);
+                config.set(key + ".showBiome",      s.showBiome);
+                config.set(key + ".showNetherXyz",  s.showNetherXyz);
+                config.set(key + ".globalEnabled",  s.globalEnabled);
+                if (s.linkedChest != null) config.set(key + ".linkedChest", s.linkedChest);
+                if (s.deathChest  != null) config.set(key + ".deathChest",  s.deathChest);
+                if (s.deathItems  != null) config.set(key + ".deathItems",  Arrays.asList(s.deathItems));
+                if (!s.waypoints.isEmpty()) {
+                    for (Map.Entry<String, org.bukkit.Location> wp : s.waypoints.entrySet()) {
+                        config.set(key + ".waypoints." + wp.getKey(), wp.getValue());
+                    }
+                }
+            }
+            if (!teleportPlates.isEmpty()) {
+                for (Map.Entry<String, org.bukkit.Location> entry : teleportPlates.entrySet()) {
+                    config.set("teleportPlates." + entry.getKey().replace(".", "[dot]"), entry.getValue());
+                }
+            }
             config.save(file);
         } catch (Exception e) {
             plugin.getLogger().severe("Could not save data.yml: " + e.getMessage());

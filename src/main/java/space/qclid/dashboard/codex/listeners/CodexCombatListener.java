@@ -58,18 +58,17 @@ public class CodexCombatListener implements Listener {
     private final ExplorerItems explorerItems;
     private final CodexCrafting codexCrafting;
     private final CodexPassiveTask codexPassiveTask;
-    private final Set<UUID> tidalSweepInProgress = new HashSet<>();
+    private final java.util.Set<java.util.UUID> tidalSweepInProgress = new java.util.HashSet<>();
 
-    public CodexCombatListener(JavaPlugin plugin, DataManager dataManager, CodexManager manager, CodexRegistry registry,
-                               ArcaneItems arcaneItems, ExplorerItems explorerItems, CodexCrafting codexCrafting, CodexPassiveTask codexPassiveTask) {
-        this.plugin = plugin;
-        this.dataManager = dataManager;
-        this.manager = manager;
-        this.registry = registry;
-        this.arcaneItems = arcaneItems;
-        this.explorerItems = explorerItems;
-        this.codexCrafting = codexCrafting;
-        this.codexPassiveTask = codexPassiveTask;
+    public CodexCombatListener(CodexContext ctx) {
+        this.plugin = ctx.plugin();
+        this.dataManager = ctx.dataManager();
+        this.manager = ctx.manager();
+        this.registry = ctx.registry();
+        this.arcaneItems = ctx.arcaneItems();
+        this.explorerItems = ctx.explorerItems();
+        this.codexCrafting = ctx.codexCrafting();
+        this.codexPassiveTask = ctx.codexPassiveTask();
     }
 
     @EventHandler
@@ -859,7 +858,7 @@ public class CodexCombatListener implements Listener {
                     target.setMetadata("catch_flame_level", new FixedMetadataValue(plugin, catchFlameLvl));
                 }
 
-                // 2. Venomous Scythe
+                // 2. Corrosive Scythe
                 if (itemId != null && itemId.equals("arcane.melee.venomous_scythe")) {
                     int currentPoison = 0;
                     PotionEffect activePoison = target.getPotionEffect(PotionEffectType.POISON);

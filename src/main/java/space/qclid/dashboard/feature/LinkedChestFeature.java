@@ -48,7 +48,7 @@ public class LinkedChestFeature {
 
                 PlayerSettings settings = data.getOrCreate(player.getUniqueId());
                 settings.linkedChest = block.getLocation();
-                data.save();
+                data.save(player.getUniqueId());
                 player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Chest linked successfully!")));
                 return 1;
             });

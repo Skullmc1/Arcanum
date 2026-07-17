@@ -40,18 +40,16 @@ public class CodexRuneListener implements Listener {
     private final CodexPassiveTask codexPassiveTask;
     private final Map<UUID, String> activeMachine;
 
-    public CodexRuneListener(JavaPlugin plugin, DataManager dataManager, CodexManager manager, CodexRegistry registry,
-                             ArcaneItems arcaneItems, ExplorerItems explorerItems, CodexCrafting codexCrafting,
-                             CodexPassiveTask codexPassiveTask, Map<UUID, String> activeMachine) {
-        this.plugin = plugin;
-        this.dataManager = dataManager;
-        this.manager = manager;
-        this.registry = registry;
-        this.arcaneItems = arcaneItems;
-        this.explorerItems = explorerItems;
-        this.codexCrafting = codexCrafting;
-        this.codexPassiveTask = codexPassiveTask;
-        this.activeMachine = activeMachine;
+    public CodexRuneListener(CodexContext ctx) {
+        this.plugin = ctx.plugin();
+        this.dataManager = ctx.dataManager();
+        this.manager = ctx.manager();
+        this.registry = ctx.registry();
+        this.arcaneItems = ctx.arcaneItems();
+        this.explorerItems = ctx.explorerItems();
+        this.codexCrafting = ctx.codexCrafting();
+        this.codexPassiveTask = ctx.codexPassiveTask();
+        this.activeMachine = ctx.activeMachine();
     }
 
     @EventHandler

@@ -166,6 +166,27 @@ public class ExplorerGadgets {
         );
     }
 
+    public ItemStack createVoidBagRefund() {
+        ItemStack item = new ItemStack(Material.CLOCK);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            NamespacedKey key = new NamespacedKey(plugin, "item_id");
+            meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "explorer.gadgets.void_bag_refund");
+            meta.displayName(parse(G_GOLD + "<bold>" + toSmallCaps("Void Bag Refund")));
+            meta.lore(List.of(
+                    MM.deserialize(C_GRAY + toSmallCaps("Reclaims the last items voided from")),
+                    MM.deserialize(C_GRAY + toSmallCaps("your Void Bag.")),
+                    MM.deserialize(""),
+                    MM.deserialize(C_YELLOW + toSmallCaps("Right-click to restore items.")),
+                    MM.deserialize(C_RED + toSmallCaps("One-time use."))
+            ));
+            meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private ItemStack createCustomSkull(String skinUrl, String itemId, String displayName, List<String> loreLines) {
         ItemStack item = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) item.getItemMeta();

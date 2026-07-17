@@ -9,7 +9,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import space.qclid.dashboard.codex.items.explorer.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ExplorerItems {
 
@@ -46,6 +48,7 @@ public class ExplorerItems {
     public final ItemStack autoSmelterItem;
     public final ItemStack safariLassoItem;
     public final ItemStack voidBagItem;
+    public final ItemStack voidBagRefundItem;
     public final ItemStack steamJetpackItem;
     public final ItemStack blockDuplicatorItem;
 
@@ -87,6 +90,41 @@ public class ExplorerItems {
         this.enderBackpackItem = gadgets.createEnderBackpack();
         this.safariLassoItem = gadgets.createSafariLasso();
         this.voidBagItem = gadgets.createVoidBag();
+        this.voidBagRefundItem = gadgets.createVoidBagRefund();
+        initItemMap();
+    }
+
+    private final Map<String, ItemStack> itemMap = new HashMap<>();
+
+    private void initItemMap() {
+        itemMap.put("machinery.heavy_forge", heavyForgeItem);
+        itemMap.put("explorer.waypoint_compass", waypointCompassItem);
+        itemMap.put("explorer.grappling_hook.iron", ironGrappleItem);
+        itemMap.put("explorer.grappling_hook.diamond", diamondGrappleItem);
+        itemMap.put("explorer.grappling_hook.netherite", netheriteGrappleItem);
+        itemMap.put("explorer.armor.spelunkers_helmet", spelunkersHelmetItem);
+        itemMap.put("explorer.armor.depth_strider_flippers", flippersItem);
+        itemMap.put("explorer.tools.builders_wand", buildersWandItem);
+        itemMap.put("explorer.tools.webber", webberItem);
+        itemMap.put("explorer.tools.web_slinger.iron", ironWebSlingerItem);
+        itemMap.put("explorer.tools.web_slinger.diamond", diamondWebSlingerItem);
+        itemMap.put("explorer.tools.web_slinger.netherite", netheriteWebSlingerItem);
+        itemMap.put("explorer.gadgets.thermal_canteen", canteenItem);
+        itemMap.put("explorer.tools.beastmasters_flute", fluteItem);
+        itemMap.put("explorer.tools.excavation_drill", drillItem);
+        itemMap.put("explorer.gadgets.teleportation_plate", teleportationPlateItem);
+        itemMap.put("explorer.armor.slime_boots", slimeBootsItem);
+        itemMap.put("explorer.exploration.ore_scanner", oreScannerItem);
+        itemMap.put("explorer.trinkets.magnetic_ring", magneticRingItem);
+        itemMap.put("explorer.trinkets.bottle_of_lightning", bottleOfLightningItem);
+        itemMap.put("explorer.gadgets.ender_backpack", enderBackpackItem);
+        itemMap.put("explorer.tools.auto_sifter", autoSifterItem);
+        itemMap.put("explorer.tools.auto_smelter", autoSmelterItem);
+        itemMap.put("explorer.gadgets.safari_lasso", safariLassoItem);
+        itemMap.put("explorer.gadgets.void_bag", voidBagItem);
+        itemMap.put("explorer.gadgets.void_bag_refund", voidBagRefundItem);
+        itemMap.put("explorer.gadgets.steam_jetpack", steamJetpackItem);
+        itemMap.put("machinery.block_duplicator", blockDuplicatorItem);
     }
 
     public ItemStack createHeavyForgeItem() {
@@ -173,6 +211,10 @@ public class ExplorerItems {
         return gadgets.createVoidBag();
     }
 
+    public ItemStack createVoidBagRefund() {
+        return gadgets.createVoidBagRefund();
+    }
+
     public ItemStack createSteamJetpack() {
         return armor.createSteamJetpack();
     }
@@ -185,40 +227,19 @@ public class ExplorerItems {
         return tools.createPortableUtility(material, itemId, displayName);
     }
 
+    /** Register an external item (from another feature) for lookup via getCustomItem. */
+    public void registerExternalItem(String id, ItemStack item) {
+        if (id != null && item != null) {
+            itemMap.put(id, item);
+        }
+    }
+
     public ItemStack getCustomItem(String id) {
         if (id == null) return null;
-        ItemStack item = null;
-        if (id.equals("machinery.heavy_forge")) item = heavyForgeItem;
-        else if (id.equals("explorer.waypoint_compass")) item = waypointCompassItem;
-        else if (id.equals("explorer.grappling_hook.iron")) item = ironGrappleItem;
-        else if (id.equals("explorer.grappling_hook.diamond")) item = diamondGrappleItem;
-        else if (id.equals("explorer.grappling_hook.netherite")) item = netheriteGrappleItem;
-        else if (id.equals("explorer.armor.spelunkers_helmet")) item = spelunkersHelmetItem;
-        else if (id.equals("explorer.armor.depth_strider_flippers")) item = flippersItem;
-        else if (id.equals("explorer.tools.builders_wand")) item = buildersWandItem;
-        else if (id.equals("explorer.tools.webber")) item = webberItem;
-        else if (id.equals("explorer.tools.web_slinger.iron")) item = ironWebSlingerItem;
-        else if (id.equals("explorer.tools.web_slinger.diamond")) item = diamondWebSlingerItem;
-        else if (id.equals("explorer.tools.web_slinger.netherite")) item = netheriteWebSlingerItem;
-        else if (id.equals("explorer.gadgets.thermal_canteen")) item = canteenItem;
-        else if (id.equals("explorer.tools.beastmasters_flute")) item = fluteItem;
-        else if (id.equals("explorer.tools.excavation_drill")) item = drillItem;
-        else if (id.equals("explorer.gadgets.teleportation_plate")) item = teleportationPlateItem;
-        else if (id.equals("explorer.armor.slime_boots")) item = slimeBootsItem;
-        else if (id.equals("explorer.exploration.ore_scanner")) item = oreScannerItem;
-        else if (id.equals("explorer.trinkets.magnetic_ring")) item = magneticRingItem;
-        else if (id.equals("explorer.trinkets.bottle_of_lightning")) item = bottleOfLightningItem;
-        else if (id.equals("explorer.gadgets.ender_backpack")) item = enderBackpackItem;
-        else if (id.equals("explorer.tools.auto_sifter")) item = autoSifterItem;
-        else if (id.equals("explorer.tools.auto_smelter")) item = autoSmelterItem;
-        else if (id.equals("explorer.gadgets.safari_lasso")) item = safariLassoItem;
-        else if (id.equals("explorer.gadgets.void_bag")) item = voidBagItem;
-        else if (id.equals("explorer.gadgets.steam_jetpack")) item = steamJetpackItem;
-        else if (id.equals("machinery.block_duplicator")) item = blockDuplicatorItem;
-        else {
+        ItemStack item = itemMap.get(id);
+        if (item == null) {
             item = createDynamicCustomItem(id);
         }
-
         if (item != null) {
             ItemStack cloned = item.clone();
             space.qclid.dashboard.util.TextUtil.wrapItemLore(cloned);

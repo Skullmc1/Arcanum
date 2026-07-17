@@ -38,9 +38,9 @@ public class NavigationFeature {
         if (target != null) {
             Location playerLoc = player.getEyeLocation().subtract(0, 0.5, 0);
             Vector direction = target.toVector().subtract(playerLoc.toVector()).normalize();
-            for (double i = 1.0; i <= 2.0; i += 0.5) {
+            for (double i = 2.0; i <= 4.0; i += 0.5) {
                 Location particleLoc = playerLoc.clone().add(direction.clone().multiply(i));
-                player.spawnParticle(Particle.FLAME, particleLoc, 1, 0, 0, 0, 0.02);
+                player.spawnParticle(Particle.END_ROD, particleLoc, 1, 0, 0, 0, 0.02);
             }
         }
     }

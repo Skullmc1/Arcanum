@@ -115,12 +115,13 @@ public class ActionBarFeature {
         PlayerSettings settings = data.getOrCreate(player.getUniqueId());
         String msg;
         switch (type) {
-            case "global" -> { settings.toggleGlobal();    msg = settings.globalEnabled ? C_GOLD   + toSmallCaps("Dashboard enabled!")    : "<red>"      + toSmallCaps("Dashboard disabled!"); }
-            case "xyz"    -> { settings.toggleXyz();       msg = settings.showXyz       ? C_ORANGE  + toSmallCaps("XYZ display enabled!")  : "<red>"      + toSmallCaps("XYZ display disabled!"); }
-            case "biome"  -> { settings.toggleBiome();     msg = settings.showBiome     ? C_YELLOW  + toSmallCaps("Biome display enabled!"): "<red>"      + toSmallCaps("Biome display disabled!"); }
-            case "nether" -> { settings.toggleNetherXyz(); msg = settings.showNetherXyz ? C_RED     + toSmallCaps("Nether XYZ enabled!")   : "<dark_red>" + toSmallCaps("Nether XYZ disabled!"); }
+            case "global" -> { settings.toggleGlobal();    msg = (settings.globalEnabled    ? C_GOLD   : C_RED) + toSmallCaps(settings.globalEnabled    ? "Dashboard enabled!"    : "Dashboard disabled!");    }
+            case "xyz"    -> { settings.toggleXyz();       msg = (settings.showXyz          ? C_ORANGE : C_RED) + toSmallCaps(settings.showXyz          ? "XYZ display enabled!"  : "XYZ display disabled!");  }
+            case "biome"  -> { settings.toggleBiome();     msg = (settings.showBiome        ? C_YELLOW : C_RED) + toSmallCaps(settings.showBiome        ? "Biome display enabled!": "Biome display disabled!"); }
+            case "nether" -> { settings.toggleNetherXyz(); msg = (settings.showNetherXyz    ? C_RED    : C_RED) + toSmallCaps(settings.showNetherXyz    ? "Nether XYZ enabled!"   : "Nether XYZ disabled!");   }
             default       -> msg = toSmallCaps("Unknown toggle.");
         }
+        data.markDirty(player.getUniqueId());
         player.sendMessage(MM.deserialize(msg));
         if (!settings.globalEnabled) player.sendActionBar(Component.empty());
         return 1;

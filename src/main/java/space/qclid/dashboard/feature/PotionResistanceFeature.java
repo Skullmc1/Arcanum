@@ -27,6 +27,9 @@ public class PotionResistanceFeature implements Listener {
     /** Tracks the last time each harmful effect was applied per player. */
     private final Map<UUID, Map<PotionEffectType, Long>> effectHistory = new HashMap<>();
 
+    /** Tracks resistance trigger count per player per effect (for action bar suffix). */
+    private final Map<UUID, Map<PotionEffectType, Integer>> effectCounts = new HashMap<>();
+
     public PotionResistanceFeature(JavaPlugin plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
@@ -58,11 +61,21 @@ public class PotionResistanceFeature implements Listener {
                 player.addPotionEffect(new PotionEffect(
                         newEffect.getType(), newDuration, newEffect.getAmplifier(),
                         newEffect.isAmbient(), newEffect.hasParticles(), newEffect.hasIcon()));
-                player.sendMessage(MM.deserialize(C_RED + "⚠ " + toSmallCaps("Resistance active") + ": "
-                        + C_ORANGE + toSmallCaps(newEffect.getType().key().value()
-                                .replace("minecraft:", "").replace("_", " "))
-                        + " " + toSmallCaps("duration halved!")));
+
+                // Increment count for this effect
+                Map<PotionEffectType, Integer> counts = effectCounts.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>());
+                int count = counts.merge(newEffect.getType(), 1, Integer::sum);
+
+                String effectName = toSmallCaps(newEffect.getType().key().value()
+                        .replace("minecraft:", "").replace("_", " "));
+                String suffix = count > 1 ? " (x" + count + ")" : "";
+                player.sendActionBar(MM.deserialize(C_RED + "⚠ " + toSmallCaps("Resistance") + ": "
+                        + C_ORANGE + effectName + " " + toSmallCaps("halved!") + suffix));
             }
+        } else {
+            // Reset count when outside the 60s window (new resistance cycle)
+            Map<PotionEffectType, Integer> counts = effectCounts.get(player.getUniqueId());
+            if (counts != null) counts.remove(newEffect.getType());
         }
         history.put(newEffect.getType(), currentTime);
     }

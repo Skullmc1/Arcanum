@@ -192,8 +192,7 @@ public class CodexPassiveTask {
 
     private void tickCatchFlameSpread() {
         for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (!(entity instanceof LivingEntity source)) continue;
+            for (LivingEntity source : world.getEntitiesByClass(LivingEntity.class)) {
                 if (source.getFireTicks() <= 0) {
                     if (source.hasMetadata("catch_flame_level")) {
                         source.removeMetadata("catch_flame_level", plugin);
@@ -472,8 +471,13 @@ public class CodexPassiveTask {
         }
     }
 
+    private final java.util.Map<org.bukkit.Location, Long> knownDroppers = new java.util.HashMap<>();
+    private static final long DROPPER_CACHE_TTL = 600_000L; // 10min cache
+
     private void runAutomations() {
-        java.util.Set<org.bukkit.Location> processed = new java.util.HashSet<>();
+        long now = System.currentTimeMillis();
+        java.util.Set<org.bukkit.Location> newlyFound = new java.util.HashSet<>();
+
         for (Player player : Bukkit.getOnlinePlayers()) {
             Location loc = player.getLocation();
             World world = loc.getWorld();
@@ -485,16 +489,31 @@ public class CodexPassiveTask {
                 for (int y = py - 4; y <= py + 4; y++) {
                     for (int z = pz - 8; z <= pz + 8; z++) {
                         org.bukkit.block.Block b = world.getBlockAt(x, y, z);
-                        if (b.getType() == Material.DROPPER) {
-                            org.bukkit.Location bLoc = b.getLocation();
-                            if (processed.contains(bLoc)) continue;
-                            processed.add(bLoc);
+                        if (b.getType() != Material.DROPPER) continue;
+                        org.bukkit.Location bLoc = b.getLocation();
 
-                            if (b.getState() instanceof org.bukkit.block.Dropper dropper) {
-                                tickAutomationDropper(dropper);
-                            }
+                        // Check cache first
+                        Long lastCheck = knownDroppers.get(bLoc);
+                        if (lastCheck != null && (now - lastCheck) < DROPPER_CACHE_TTL) continue;
+
+                        newlyFound.add(bLoc);
+                        knownDroppers.put(bLoc, now);
+
+                        if (b.getState() instanceof org.bukkit.block.Dropper dropper) {
+                            tickAutomationDropper(dropper);
                         }
                     }
+                }
+            }
+        }
+
+        // Clean stale entries every 5th run
+        if (scanCounter % 5 == 0 && !newlyFound.isEmpty()) {
+            int staleCutoff = 0;
+            for (java.util.Iterator<java.util.Map.Entry<org.bukkit.Location, Long>> it = knownDroppers.entrySet().iterator(); it.hasNext();) {
+                if ((now - it.next().getValue()) > DROPPER_CACHE_TTL * 2) {
+                    it.remove();
+                    staleCutoff++;
                 }
             }
         }

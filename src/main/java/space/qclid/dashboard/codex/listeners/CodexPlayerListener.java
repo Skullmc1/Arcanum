@@ -48,19 +48,19 @@ public class CodexPlayerListener implements Listener {
     private final CodexCrafting codexCrafting;
     private final CodexPassiveTask codexPassiveTask;
     private final Map<UUID, String> activeMachine;
+    private final Map<UUID, ItemStack[]> lastVoidedItems;
 
-    public CodexPlayerListener(JavaPlugin plugin, DataManager dataManager, CodexManager manager, CodexRegistry registry,
-                               ArcaneItems arcaneItems, ExplorerItems explorerItems, CodexCrafting codexCrafting,
-                               CodexPassiveTask codexPassiveTask, Map<UUID, String> activeMachine) {
-        this.plugin = plugin;
-        this.dataManager = dataManager;
-        this.manager = manager;
-        this.registry = registry;
-        this.arcaneItems = arcaneItems;
-        this.explorerItems = explorerItems;
-        this.codexCrafting = codexCrafting;
-        this.codexPassiveTask = codexPassiveTask;
-        this.activeMachine = activeMachine;
+    public CodexPlayerListener(CodexContext ctx) {
+        this.plugin = ctx.plugin();
+        this.dataManager = ctx.dataManager();
+        this.manager = ctx.manager();
+        this.registry = ctx.registry();
+        this.arcaneItems = ctx.arcaneItems();
+        this.explorerItems = ctx.explorerItems();
+        this.codexCrafting = ctx.codexCrafting();
+        this.codexPassiveTask = ctx.codexPassiveTask();
+        this.activeMachine = ctx.activeMachine();
+        this.lastVoidedItems = ctx.lastVoidedItems();
     }
 
     @EventHandler
@@ -73,9 +73,12 @@ public class CodexPlayerListener implements Listener {
         }
 
         if (event.getInventory().getHolder() instanceof VoidBagInventoryHolder) {
+            // Capture backup before clearing
+            lastVoidedItems.put(player.getUniqueId(), event.getInventory().getContents());
             event.getInventory().clear();
             player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.5f, 0.5f);
             player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Void Bag items have been deleted!")));
+            player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Craft a Void Bag Refund to reclaim them!")));
         }
 
         // Return portable furnace/smelter items on close
@@ -86,32 +89,31 @@ public class CodexPlayerListener implements Listener {
             returnFurnaceItems(player, codexPassiveTask.activeSmelters.remove(player.getUniqueId()));
         }
 
-        // Refresh all items upon inventory close
+        // Refresh only custom items upon inventory close
         refreshItemLore(player.getItemOnCursor(), plugin);
         for (ItemStack item : event.getInventory().getContents()) {
-            refreshItemLore(item, plugin);
+            if (hasCustomData(item)) refreshItemLore(item, plugin);
         }
         for (ItemStack item : player.getInventory().getContents()) {
-            refreshItemLore(item, plugin);
+            if (hasCustomData(item)) refreshItemLore(item, plugin);
         }
     }
 
     @EventHandler
     public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getWhoClicked() instanceof Player)) return;
         
-        refreshItemLore(event.getCurrentItem(), plugin);
-        refreshItemLore(event.getCursor(), plugin);
-        
-        plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, task -> {
-            if (player.isOnline()) {
-                refreshItemLore(player.getItemOnCursor(), plugin);
-                refreshItemLore(event.getCurrentItem(), plugin);
-                if (event.getClickedInventory() != null && event.getSlot() >= 0 && event.getSlot() < event.getClickedInventory().getSize()) {
-                    refreshItemLore(event.getClickedInventory().getItem(event.getSlot()), plugin);
-                }
-            }
-        }, 1L);
+        // Refresh immediately (only custom items)
+        if (hasCustomData(event.getCurrentItem())) refreshItemLore(event.getCurrentItem(), plugin);
+        if (hasCustomData(event.getCursor())) refreshItemLore(event.getCursor(), plugin);
+    }
+
+    /** Quick check if an item has plugin custom data before doing full lore refresh. */
+    private boolean hasCustomData(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return false;
+        return !meta.getPersistentDataContainer().isEmpty();
     }
 
     private void returnFurnaceItems(Player player, Inventory inv) {

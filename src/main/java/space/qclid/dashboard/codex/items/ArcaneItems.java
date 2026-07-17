@@ -11,7 +11,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import space.qclid.dashboard.codex.items.arcane.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ArcaneItems {
 
@@ -134,6 +136,8 @@ public class ArcaneItems {
         this.wandOfLevitationItem = weapons.createWandOfLevitation();
         this.siphonBladeItem = weapons.createSiphonBlade();
         this.staffOfTheStormlordItem = weapons.createStaffOfTheStormlord();
+
+        initItemMap();
     }
 
     public boolean isCustomItem(ItemStack item, String expectedId) {
@@ -345,8 +349,8 @@ public class ArcaneItems {
         return weapons.createSiphonBlade();
     }
 
-    public ItemStack createVenomousScythe() {
-        return weapons.createVenomousScythe();
+    public ItemStack createCorrosiveScythe() {
+        return weapons.createCorrosiveScythe();
     }
 
     public ItemStack createWandOfTransmutation() {
@@ -360,61 +364,66 @@ public class ArcaneItems {
 
     public ItemStack getCustomItem(String id) {
         if (id == null) return null;
-        ItemStack item = null;
-        if (id.equals("machinery.arcana_table")) item = arcanaTableItem;
-        else if (id.equals("machinery.upgrade_table")) item = upgradeTableItem;
-        else if (id.equals("arcane.lifesteal_rune")) item = lifestealRuneItem;
-        else if (id.equals("arcane.speed_rune")) item = speedRuneItem;
-        else if (id.equals("arcane.speed_boots")) item = speedBootsItem;
-        else if (id.equals("arcane.wand_of_embers")) item = wandOfEmbersItem;
-        else if (id.equals("arcane.materials.immolation_totem")) item = immolationTotemItem;
-        else if (id.equals("arcane.runes.catch_flame")) item = catchFlameRuneItem;
-        else if (id.equals("arcane.runes.catch_flame_2")) item = catchFlameRune2Item;
-        else if (id.equals("arcane.runes.catch_flame_3")) item = catchFlameRune3Item;
-        else if (id.equals("arcane.materials.ender_essence")) item = enderEssence;
-        else if (id.equals("arcane.materials.hardened_coal_1")) item = hardenedCoal1;
-        else if (id.equals("arcane.materials.hardened_coal_2")) item = hardenedCoal2;
-        else if (id.equals("arcane.materials.hardened_coal_max")) item = hardenedCoalMax;
-        else if (id.equals("arcane.materials.hardened_base_1")) item = hardenedBase1;
-        else if (id.equals("arcane.materials.hardened_base_2")) item = hardenedBase2;
-        else if (id.equals("arcane.materials.hardened_base_max")) item = hardenedBaseMax;
-        else if (id.equals("arcane.materials.synthetic_diamond")) item = syntheticDiamond;
-        else if (id.equals("arcane.materials.synthetic_emerald")) item = syntheticEmerald;
-        else if (id.equals("arcane.materials.echoing_core")) item = echoingCore;
-        else if (id.equals("arcane.armor.shadow_cloak")) item = shadowCloak;
-        else if (id.equals("arcane.armor.superior_shadow_cloak")) item = superiorShadowCloak;
-        else if (id.equals("arcane.trinkets.vitality_geode_1")) item = geode1;
-        else if (id.equals("arcane.trinkets.vitality_geode_2")) item = geode2;
-        else if (id.equals("arcane.trinkets.vitality_geode_3")) item = geode3;
-        else if (id.equals("arcane.ranged.wand_of_levitation")) item = wandOfLevitationItem;
-        else if (id.equals("arcane.armor.gale_chestplate")) item = galeChestplateItem;
-        else if (id.equals("arcane.melee.siphon_blade")) item = siphonBladeItem;
-        else if (id.equals("arcane.materials.lightning_essence")) item = lightningEssenceItem;
-        else if (id.equals("arcane.ranged.staff_of_the_stormlord")) item = staffOfTheStormlordItem;
-        else if (id.equals("arcane.materials.empty_vial")) item = emptyVialItem;
-        else if (id.equals("arcane.materials.blood")) item = bloodItem;
-        else if (id.equals("arcane.runes.demonium")) item = demoniumRuneItem;
-        else if (id.equals("arcane.runes.demonium_2")) item = demoniumRune2Item;
-        else if (id.equals("arcane.runes.demonium_3")) item = demoniumRune3Item;
-        else if (id.equals("machinery.blood_altar")) item = bloodAltarItem;
-        else if (id.equals("arcane.melee.natures_embrace")) item = naturesEmbraceItem;
-        else if (id.equals("arcane.melee.suns_brilliance")) item = sunsBrillianceItem;
-        else if (id.equals("arcane.trinkets.link_stone")) item = linkStoneItem;
-        else if (id.equals("arcane.materials.poison_vial")) item = poisonVialItem;
-        else if (id.equals("arcane.materials.soul_orb")) item = soulOrbItem;
-        else if (id.equals("arcane.trinkets.blessing_of_the_void")) item = blessingOfTheVoidItem;
-        else if (id.equals("arcane.materials.resonant_plate")) item = resonantPlateItem;
-        else if (id.equals("arcane.materials.core_of_heat")) item = coreOfHeat;
-        else {
+        ItemStack item = itemMap.get(id);
+        if (item == null) {
             item = createDynamicCustomItem(id);
         }
-
         if (item != null) {
             ItemStack cloned = item.clone();
             space.qclid.dashboard.util.TextUtil.wrapItemLore(cloned);
             return cloned;
         }
         return null;
+    }
+
+    private final Map<String, ItemStack> itemMap = new HashMap<>();
+
+    private void initItemMap() {
+        itemMap.put("machinery.arcana_table", arcanaTableItem);
+        itemMap.put("machinery.upgrade_table", upgradeTableItem);
+        itemMap.put("arcane.lifesteal_rune", lifestealRuneItem);
+        itemMap.put("arcane.speed_rune", speedRuneItem);
+        itemMap.put("arcane.speed_boots", speedBootsItem);
+        itemMap.put("arcane.wand_of_embers", wandOfEmbersItem);
+        itemMap.put("arcane.materials.immolation_totem", immolationTotemItem);
+        itemMap.put("arcane.runes.catch_flame", catchFlameRuneItem);
+        itemMap.put("arcane.runes.catch_flame_2", catchFlameRune2Item);
+        itemMap.put("arcane.runes.catch_flame_3", catchFlameRune3Item);
+        itemMap.put("arcane.materials.ender_essence", enderEssence);
+        itemMap.put("arcane.materials.hardened_coal_1", hardenedCoal1);
+        itemMap.put("arcane.materials.hardened_coal_2", hardenedCoal2);
+        itemMap.put("arcane.materials.hardened_coal_max", hardenedCoalMax);
+        itemMap.put("arcane.materials.hardened_base_1", hardenedBase1);
+        itemMap.put("arcane.materials.hardened_base_2", hardenedBase2);
+        itemMap.put("arcane.materials.hardened_base_max", hardenedBaseMax);
+        itemMap.put("arcane.materials.synthetic_diamond", syntheticDiamond);
+        itemMap.put("arcane.materials.synthetic_emerald", syntheticEmerald);
+        itemMap.put("arcane.materials.echoing_core", echoingCore);
+        itemMap.put("arcane.materials.potent_spider_web", potentSpiderWeb);
+        itemMap.put("arcane.armor.shadow_cloak", shadowCloak);
+        itemMap.put("arcane.armor.superior_shadow_cloak", superiorShadowCloak);
+        itemMap.put("arcane.trinkets.vitality_geode_1", geode1);
+        itemMap.put("arcane.trinkets.vitality_geode_2", geode2);
+        itemMap.put("arcane.trinkets.vitality_geode_3", geode3);
+        itemMap.put("arcane.ranged.wand_of_levitation", wandOfLevitationItem);
+        itemMap.put("arcane.armor.gale_chestplate", galeChestplateItem);
+        itemMap.put("arcane.melee.siphon_blade", siphonBladeItem);
+        itemMap.put("arcane.materials.lightning_essence", lightningEssenceItem);
+        itemMap.put("arcane.ranged.staff_of_the_stormlord", staffOfTheStormlordItem);
+        itemMap.put("arcane.materials.empty_vial", emptyVialItem);
+        itemMap.put("arcane.materials.blood", bloodItem);
+        itemMap.put("arcane.runes.demonium", demoniumRuneItem);
+        itemMap.put("arcane.runes.demonium_2", demoniumRune2Item);
+        itemMap.put("arcane.runes.demonium_3", demoniumRune3Item);
+        itemMap.put("machinery.blood_altar", bloodAltarItem);
+        itemMap.put("arcane.melee.natures_embrace", naturesEmbraceItem);
+        itemMap.put("arcane.melee.suns_brilliance", sunsBrillianceItem);
+        itemMap.put("arcane.trinkets.link_stone", linkStoneItem);
+        itemMap.put("arcane.materials.poison_vial", poisonVialItem);
+        itemMap.put("arcane.materials.soul_orb", soulOrbItem);
+        itemMap.put("arcane.trinkets.blessing_of_the_void", blessingOfTheVoidItem);
+        itemMap.put("arcane.materials.resonant_plate", resonantPlateItem);
+        itemMap.put("arcane.materials.core_of_heat", coreOfHeat);
     }
 
     public ItemStack createDynamicCustomItem(String id) {
@@ -440,7 +449,7 @@ public class ArcaneItems {
             if (meta != null) {
                 NamespacedKey key = new NamespacedKey(plugin, "item_id");
                 meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, id);
-                meta.displayName(org.bukkit.Color.fromRGB(128, 0, 128) != null ? space.qclid.dashboard.util.TextUtil.parse(space.qclid.dashboard.util.TextUtil.C_PURPLE + "<bold>" + space.qclid.dashboard.util.TextUtil.toSmallCaps(name)) : null);
+                meta.displayName(space.qclid.dashboard.util.TextUtil.parse(space.qclid.dashboard.util.TextUtil.C_PURPLE + "<bold>" + space.qclid.dashboard.util.TextUtil.toSmallCaps(name)));
                 meta.lore(List.of(
                         space.qclid.dashboard.util.TextUtil.MM.deserialize(space.qclid.dashboard.util.TextUtil.C_GRAY + space.qclid.dashboard.util.TextUtil.toSmallCaps(loreDesc))
                 ));

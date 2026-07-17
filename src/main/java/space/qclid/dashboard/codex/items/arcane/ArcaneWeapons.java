@@ -114,16 +114,16 @@ public class ArcaneWeapons {
         return item;
     }
 
-    public ItemStack createVenomousScythe() {
+    public ItemStack createCorrosiveScythe() {
         ItemStack item = new ItemStack(Material.IRON_HOE);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             NamespacedKey key = new NamespacedKey(plugin, "item_id");
             meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, "arcane.melee.venomous_scythe");
-            meta.displayName(parse(C_PURPLE + "<bold>" + toSmallCaps("Venomous Scythe")));
+            meta.displayName(parse(C_PURPLE + "<bold>" + toSmallCaps("Corrosive Scythe")));
             meta.lore(List.of(
-                    MM.deserialize(C_GRAY + toSmallCaps("Applies stacking poison on hit.")),
-                    MM.deserialize(C_GRAY + toSmallCaps("Deals bonus damage to poisoned mobs."))
+                    MM.deserialize(C_GRAY + toSmallCaps("Degrades enemy armor on each hit.")),
+                    MM.deserialize(C_GRAY + toSmallCaps("Reduces their protection over time."))
             ));
             meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
             meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);

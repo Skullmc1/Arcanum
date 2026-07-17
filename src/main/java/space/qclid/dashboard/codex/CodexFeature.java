@@ -1,6 +1,8 @@
 package space.qclid.dashboard.codex;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import io.papermc.paper.command.brigadier.Commands;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -19,6 +21,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import space.qclid.dashboard.codex.gui.CodexGuiListener;
 import space.qclid.dashboard.codex.gui.CodexMainGui;
 import space.qclid.dashboard.data.DataManager;
+import space.qclid.dashboard.feature.NewGadgetsFeature;
 
 import space.qclid.dashboard.codex.core.*;
 import space.qclid.dashboard.codex.items.*;
@@ -27,6 +30,7 @@ import space.qclid.dashboard.codex.listeners.*;
 import space.qclid.dashboard.codex.tasks.*;
 
 import java.util.List;
+import java.util.Map;
 
 import static space.qclid.dashboard.util.TextUtil.*;
 
@@ -40,6 +44,7 @@ public class CodexFeature {
     // Modular handlers
     private final ArcaneItems arcaneItems;
     private final ExplorerItems explorerItems;
+    private final NewGadgetsFeature newGadgets;
     private final CodexCrafting codexCrafting;
     private final CodexPassiveTask codexPassiveTask;
     private final CodexCombatListener codexCombatListener;
@@ -47,6 +52,7 @@ public class CodexFeature {
     private final CodexPlayerListener codexPlayerListener;
     private final CodexRuneListener codexRuneListener;
     private final java.util.Map<java.util.UUID, String> activeMachine = new java.util.HashMap<>();
+    private final java.util.Map<java.util.UUID, org.bukkit.inventory.ItemStack[]> lastVoidedItems = new java.util.HashMap<>();
 
     public CodexFeature(JavaPlugin plugin, DataManager dataManager) {
         this.plugin = plugin;
@@ -57,13 +63,26 @@ public class CodexFeature {
         // Initialize sub-components
         this.arcaneItems = new ArcaneItems(plugin);
         this.explorerItems = new ExplorerItems(plugin);
+        this.newGadgets = new NewGadgetsFeature(plugin);
         this.codexCrafting = new CodexCrafting(plugin, manager, registry, arcaneItems);
         this.codexPassiveTask = new CodexPassiveTask(plugin, arcaneItems);
         
-        this.codexCombatListener = new CodexCombatListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask);
-        this.codexInteractionListener = new CodexInteractionListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine);
-        this.codexPlayerListener = new CodexPlayerListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine);
-        this.codexRuneListener = new CodexRuneListener(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine);
+        // Register new gadget items with ExplorerItems for getCustomItem lookup
+        explorerItems.registerExternalItem("explorer.gadgets.echo_locator", newGadgets.echoLocator);
+        explorerItems.registerExternalItem("explorer.gadgets.void_chisel", newGadgets.voidChisel);
+        explorerItems.registerExternalItem("explorer.gadgets.gravity_well", newGadgets.gravityWell);
+        explorerItems.registerExternalItem("explorer.gadgets.seismograph", newGadgets.seismograph);
+        explorerItems.registerExternalItem("explorer.gadgets.spectral_crossing", newGadgets.spectralCrossing);
+        explorerItems.registerExternalItem("explorer.gadgets.holographic_decoy", newGadgets.holographicDecoy);
+        explorerItems.registerExternalItem("explorer.gadgets.null_spear", newGadgets.nullSpear);
+        explorerItems.registerExternalItem("explorer.gadgets.wormhole", newGadgets.wormhole);
+
+        CodexContext ctx = new CodexContext(plugin, dataManager, manager, registry, arcaneItems, explorerItems, codexCrafting, codexPassiveTask, activeMachine, lastVoidedItems);
+        
+        this.codexCombatListener = new CodexCombatListener(ctx);
+        this.codexInteractionListener = new CodexInteractionListener(ctx);
+        this.codexPlayerListener = new CodexPlayerListener(ctx);
+        this.codexRuneListener = new CodexRuneListener(ctx);
 
         // Register listeners
         plugin.getServer().getPluginManager().registerEvents(codexCombatListener, plugin);
@@ -142,6 +161,17 @@ public class CodexFeature {
         registry.registerCategory(explorerRunesDemonic);
         registry.registerCategory(explorerRunesHoly);
 
+        initItemsPart1(machineryStations, arcaneRunesNormal, arcaneArmor, arcaneRanged, explorerNavigation, explorerGadgets, arcaneMaterials, arcaneTrinkets, arcaneRunesDemonic, arcaneMelee, explorerArmor, explorerTools, explorerExploration, arcaneBoosts, arcaneIngredients, arcaneRunesHoly, explorerRunesNormal, explorerRunesDemonic, explorerRunesHoly);
+        initItemsPart2(machineryStations, arcaneRunesNormal, arcaneArmor, arcaneRanged, explorerNavigation, explorerGadgets, arcaneMaterials, arcaneTrinkets, arcaneRunesDemonic, arcaneMelee, explorerArmor, explorerTools, explorerExploration, arcaneBoosts, arcaneIngredients, arcaneRunesHoly, explorerRunesNormal, explorerRunesDemonic, explorerRunesHoly);
+        initItemsPart3(machineryStations, arcaneRunesNormal, arcaneArmor, arcaneRanged, explorerNavigation, explorerGadgets, arcaneMaterials, arcaneTrinkets, arcaneRunesDemonic, arcaneMelee, explorerArmor, explorerTools, explorerExploration, arcaneBoosts, arcaneIngredients, arcaneRunesHoly, explorerRunesNormal, explorerRunesDemonic, explorerRunesHoly);
+        initItemsPart4(machineryStations, arcaneRunesNormal, arcaneArmor, arcaneRanged, explorerNavigation, explorerGadgets, arcaneMaterials, arcaneTrinkets, arcaneRunesDemonic, arcaneMelee, explorerArmor, explorerTools, explorerExploration, arcaneBoosts, arcaneIngredients, arcaneRunesHoly, explorerRunesNormal, explorerRunesDemonic, explorerRunesHoly);
+
+        newGadgets.registerInCodex(explorerGadgets, registry);
+
+        registerRecipes();
+    }
+
+    private void initItemsPart1(CodexCategory machineryStations, CodexCategory arcaneRunesNormal, CodexCategory arcaneArmor, CodexCategory arcaneRanged, CodexCategory explorerNavigation, CodexCategory explorerGadgets, CodexCategory arcaneMaterials, CodexCategory arcaneTrinkets, CodexCategory arcaneRunesDemonic, CodexCategory arcaneMelee, CodexCategory explorerArmor, CodexCategory explorerTools, CodexCategory explorerExploration, CodexCategory arcaneBoosts, CodexCategory arcaneIngredients, CodexCategory arcaneRunesHoly, CodexCategory explorerRunesNormal, CodexCategory explorerRunesDemonic, CodexCategory explorerRunesHoly) {
         // 1. Arcana Table
         CodexItem arcanaTableCodex = new CodexItem.Builder("machinery.arcana_table")
                 .displayName("Arcana Table")
@@ -575,6 +605,10 @@ public class CodexFeature {
                 .build();
         arcaneMaterials.addItem(hcMax);
 
+    }
+
+    private void initItemsPart2(CodexCategory machineryStations, CodexCategory arcaneRunesNormal, CodexCategory arcaneArmor, CodexCategory arcaneRanged, CodexCategory explorerNavigation, CodexCategory explorerGadgets, CodexCategory arcaneMaterials, CodexCategory arcaneTrinkets, CodexCategory arcaneRunesDemonic, CodexCategory arcaneMelee, CodexCategory explorerArmor, CodexCategory explorerTools, CodexCategory explorerExploration, CodexCategory arcaneBoosts, CodexCategory arcaneIngredients, CodexCategory arcaneRunesHoly, CodexCategory explorerRunesNormal, CodexCategory explorerRunesDemonic, CodexCategory explorerRunesHoly) {
+
         // 16. Hardened Base I
         CodexItem hb1 = new CodexItem.Builder("arcane.materials.hardened_base_1")
                 .displayName("Hardened Base I")
@@ -832,14 +866,13 @@ public class CodexFeature {
                 .build();
         arcaneArmor.addItem(superiorCloak);
 
-        // 28. Venomous Scythe
+        // 28. Corrosive Scythe
         CodexItem scythe = new CodexItem.Builder("arcane.melee.venomous_scythe")
-                .displayName("Armor Scythe")
-                .displayName("Venomous Scythe")
-                .displayItem(arcaneItems.createVenomousScythe())
+                .displayName("Corrosive Scythe")
+                .displayItem(arcaneItems.createCorrosiveScythe())
                 .xpCost(18)
                 .requires(new ItemStack(Material.SPIDER_EYE, 4))
-                .description("Iron hoe scythe applying stacking poison on hit (+extra damage).")
+                .description("Iron hoe scythe that degrades enemy armor on each hit.")
                 .craftingStation(arcaneItems.arcanaTableItem)
                 .recipe(
                         new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.FERMENTED_SPIDER_EYE),
@@ -1024,6 +1057,10 @@ public class CodexFeature {
                 )
                 .build();
         explorerTools.addItem(pcSmithing);
+
+    }
+
+    private void initItemsPart3(CodexCategory machineryStations, CodexCategory arcaneRunesNormal, CodexCategory arcaneArmor, CodexCategory arcaneRanged, CodexCategory explorerNavigation, CodexCategory explorerGadgets, CodexCategory arcaneMaterials, CodexCategory arcaneTrinkets, CodexCategory arcaneRunesDemonic, CodexCategory arcaneMelee, CodexCategory explorerArmor, CodexCategory explorerTools, CodexCategory explorerExploration, CodexCategory arcaneBoosts, CodexCategory arcaneIngredients, CodexCategory arcaneRunesHoly, CodexCategory explorerRunesNormal, CodexCategory explorerRunesDemonic, CodexCategory explorerRunesHoly) {
 
         // 40. Portable Grindstone
         CodexItem pcGrind = new CodexItem.Builder("explorer.tools.portable_grindstone")
@@ -1336,8 +1373,8 @@ public class CodexFeature {
                 .displayItem(arcaneItems.lightningEssenceItem)
                 .xpCost(1)
                 .defaultUnlocked(true)
-                .description("A crackling trace of pure lightning.")
-                .craftingStation(new ItemStack(Material.ZOMBIE_HEAD))
+                .description("A crackling trace of pure lightning. Rare drop from Creepers struck by lightning.")
+                .craftingStation(new ItemStack(Material.CREEPER_HEAD))
                 .recipe(
                         null, null, null,
                         null, null, null,
@@ -1457,6 +1494,10 @@ public class CodexFeature {
                 )
                 .build();
         arcaneRunesDemonic.addItem(demoniumII);
+
+    }
+
+    private void initItemsPart4(CodexCategory machineryStations, CodexCategory arcaneRunesNormal, CodexCategory arcaneArmor, CodexCategory arcaneRanged, CodexCategory explorerNavigation, CodexCategory explorerGadgets, CodexCategory arcaneMaterials, CodexCategory arcaneTrinkets, CodexCategory arcaneRunesDemonic, CodexCategory arcaneMelee, CodexCategory explorerArmor, CodexCategory explorerTools, CodexCategory explorerExploration, CodexCategory arcaneBoosts, CodexCategory arcaneIngredients, CodexCategory arcaneRunesHoly, CodexCategory explorerRunesNormal, CodexCategory explorerRunesDemonic, CodexCategory explorerRunesHoly) {
 
         // 9. Demonium III
         CodexItem demoniumIII = new CodexItem.Builder("arcane.runes.demonium_3")
@@ -1896,7 +1937,7 @@ public class CodexFeature {
                         new ItemStack(Material.AMETHYST_SHARD), arcaneItems.getCustomItem("arcane.materials.ender_essence"), new ItemStack(Material.AMETHYST_SHARD)
                 ).build());
 
-        registerRecipes();
+
     }
 
     private void registerRecipes() {
@@ -2653,6 +2694,71 @@ public class CodexFeature {
                     return 1;
                 }).build(), "Receive the Codex guide book", List.of());
 
+        // ── /codex wiki — browsable in-game item catalog ───────────────────────
+        commands.register(Commands.literal("codex")
+            .then(Commands.literal("wiki")
+                .executes(ctx -> {
+                    if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                    showWikiCategories(player);
+                    return 1;
+                })
+                .then(Commands.argument("parent", StringArgumentType.word())
+                    .suggests((ctx, b) -> {
+                        String remaining = b.getRemaining().toLowerCase();
+                        registry.getCategories().stream()
+                            .map(CodexCategory::getParentCategoryId)
+                            .distinct()
+                            .filter(c -> c.toLowerCase().startsWith(remaining))
+                            .forEach(b::suggest);
+                        return b.buildFuture();
+                    })
+                    .executes(ctx -> {
+                        if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                        String parent = ctx.getArgument("parent", String.class);
+                        showWikiSubcategories(player, parent);
+                        return 1;
+                    })
+                    .then(Commands.argument("subcategory", StringArgumentType.word())
+                        .suggests((ctx, b) -> {
+                            String parent = ctx.getArgument("parent", String.class);
+                            String remaining = b.getRemaining().toLowerCase();
+                            registry.getCategories().stream()
+                                .filter(c -> c.getParentCategoryId().equalsIgnoreCase(parent))
+                                .map(CodexCategory::getId)
+                                .filter(id -> id.toLowerCase().startsWith(remaining))
+                                .forEach(b::suggest);
+                            return b.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                            String subId = ctx.getArgument("subcategory", String.class);
+                            showWikiItems(player, subId);
+                            return 1;
+                        })
+                        .then(Commands.argument("item", StringArgumentType.word())
+                            .suggests((ctx, b) -> {
+                                String subId = ctx.getArgument("subcategory", String.class);
+                                String remaining = b.getRemaining().toLowerCase();
+                                CodexCategory cat = registry.getCategory(subId);
+                                if (cat != null) {
+                                    cat.getItems().stream()
+                                        .map(CodexItem::getId)
+                                        .filter(id -> id.toLowerCase().startsWith(remaining))
+                                        .forEach(b::suggest);
+                                }
+                                return b.buildFuture();
+                            })
+                            .executes(ctx -> {
+                                if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
+                                String itemId = ctx.getArgument("item", String.class);
+                                showWikiItemDetail(player, itemId);
+                                return 1;
+                            })
+                        )
+                    )
+                )
+            ).build(), "Browse the Codex item catalog in-game", List.of("wiki"));
+
         commands.register(Commands.literal("codexitem")
                 .executes(ctx -> {
                     if (!(ctx.getSource().getSender() instanceof Player player)) return 1;
@@ -3104,6 +3210,175 @@ public class CodexFeature {
         }
         player.playSound(player.getLocation(), Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
         player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Given the Codex!")));
+    }
+
+    // ── /codex wiki helpers ───────────────────────────────────────────────────
+
+    private void showWikiCategories(Player player) {
+        player.sendMessage(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps("Codex Wiki — Categories")));
+        player.sendMessage(MM.deserialize(C_GRAY + toSmallCaps("Click a category to browse its subcategories.")));
+        player.sendMessage(Component.empty());
+
+        registry.getCategories().stream()
+            .map(CodexCategory::getParentCategoryId)
+            .distinct()
+            .forEach(parent -> {
+                String cmd = "/codex wiki " + parent;
+                player.sendMessage(MM.deserialize(
+                    C_GREEN + "  • " +
+                    "<click:run_command:'" + cmd + "'>" +
+                    "<hover:show_text:'" + toSmallCaps("Browse ") + parent + "'>" +
+                    C_ORANGE + toSmallCaps(parent) +
+                    "</hover></click>"
+                ));
+            });
+    }
+
+    private void showWikiSubcategories(Player player, String parent) {
+        player.sendMessage(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps("Codex Wiki — ") + toSmallCaps(parent)));
+        player.sendMessage(MM.deserialize(C_GRAY + toSmallCaps("Click a subcategory to see its items.")));
+        player.sendMessage(Component.empty());
+
+        registry.getCategories().stream()
+            .filter(c -> c.getParentCategoryId().equalsIgnoreCase(parent))
+            .forEach(cat -> {
+                String cmd = "/codex wiki " + parent + " " + cat.getId();
+                int itemCount = cat.getItems().size();
+                player.sendMessage(MM.deserialize(
+                    C_GREEN + "  • " +
+                    "<click:run_command:'" + cmd + "'>" +
+                    "<hover:show_text:'" + itemCount + " " + toSmallCaps("items") + "'>" +
+                    C_ORANGE + toSmallCaps(cat.getDisplayName()) + C_GRAY + " (" + itemCount + ")" +
+                    "</hover></click>"
+                ));
+            });
+
+        // Back button
+        player.sendMessage(Component.empty());
+        player.sendMessage(MM.deserialize(
+            "<click:run_command:'/codex wiki'><hover:show_text:'" + toSmallCaps("Back to categories") + "'>" +
+            C_GRAY + "<bold>← " + toSmallCaps("Back") + "</bold></hover></click>"
+        ));
+    }
+
+    private void showWikiItems(Player player, String subcategoryId) {
+        CodexCategory cat = registry.getCategory(subcategoryId);
+        if (cat == null) {
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Subcategory not found!")));
+            return;
+        }
+
+        player.sendMessage(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps("Codex Wiki — ") + toSmallCaps(cat.getDisplayName())));
+        player.sendMessage(MM.deserialize(C_GRAY + toSmallCaps("Click an item to see its details.")));
+        player.sendMessage(Component.empty());
+
+        for (CodexItem item : cat.getItems()) {
+            String cmd = "/codex wiki " + cat.getParentCategoryId() + " " + subcategoryId + " " + item.getId();
+            boolean unlocked = manager.isUnlocked(player.getUniqueId(), item.getId());
+            String color = unlocked ? C_GREEN : C_RED;
+            String status = unlocked ? toSmallCaps("Unlocked") : toSmallCaps("Locked");
+            String desc = item.getDescription() != null && !item.getDescription().isEmpty()
+                ? item.getDescription() : toSmallCaps("No description");
+            player.sendMessage(MM.deserialize(
+                "  " + color + "• " +
+                "<click:run_command:'" + cmd + "'>" +
+                "<hover:show_text:'" + status + "\n" + C_GRAY + desc + "'>" +
+                C_ORANGE + toSmallCaps(item.getDisplayName()) +
+                "</hover></click>"
+            ));
+        }
+
+        // Back button
+        player.sendMessage(Component.empty());
+        String parentCmd = "/codex wiki " + cat.getParentCategoryId();
+        player.sendMessage(MM.deserialize(
+            "<click:run_command:'" + parentCmd + "'><hover:show_text:'" + toSmallCaps("Back to subcategories") + "'>" +
+            C_GRAY + "<bold>← " + toSmallCaps("Back") + "</bold></hover></click>"
+        ));
+    }
+
+    private void showWikiItemDetail(Player player, String itemId) {
+        CodexItem item = registry.getItem(itemId);
+        if (item == null) {
+            player.sendMessage(MM.deserialize(C_RED + toSmallCaps("Item not found!")));
+            return;
+        }
+
+        CodexCategory cat = null;
+        for (CodexCategory c : registry.getCategories()) {
+            if (c.getItems().contains(item)) {
+                cat = c;
+                break;
+            }
+        }
+
+        boolean unlocked = manager.isUnlocked(player.getUniqueId(), itemId);
+        String unlockColor = unlocked ? C_GREEN : C_RED;
+        String unlockStatus = unlocked ? toSmallCaps("Unlocked") : toSmallCaps("Locked — unlock in the Codex GUI");
+
+        player.sendMessage(MM.deserialize(C_GOLD + "<bold>" + toSmallCaps(item.getDisplayName())));
+        player.sendMessage(MM.deserialize(C_GRAY + toSmallCaps("ID") + ": " + C_ORANGE + itemId));
+        player.sendMessage(Component.empty());
+
+        // Description
+        if (item.getDescription() != null && !item.getDescription().isEmpty()) {
+            player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Description") + ":"));
+            player.sendMessage(MM.deserialize(C_GRAY + item.getDescription()));
+            player.sendMessage(Component.empty());
+        }
+
+        // Unlock status
+        player.sendMessage(MM.deserialize(unlockColor + toSmallCaps("Status") + ": " + unlockStatus));
+        player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("XP Cost") + ": " + C_ORANGE + item.getXpCost()));
+
+        // Requirements
+        if (!item.getItemRequirements().isEmpty()) {
+            player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Requirements") + ":"));
+            for (ItemStack req : item.getItemRequirements()) {
+                String reqName = req.getItemMeta() != null && req.getItemMeta().hasDisplayName()
+                    ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(req.getItemMeta().displayName())
+                    : toSmallCaps(req.getType().name().replace("_", " "));
+                player.sendMessage(MM.deserialize(C_GRAY + "  • " + reqName + " x" + req.getAmount()));
+            }
+        }
+
+        // Crafting station
+        String stationName = toSmallCaps("Crafting Table");
+        if (item.getCraftingStation() != null) {
+            ItemStack station = item.getCraftingStation();
+            ItemMeta sm = station.getItemMeta();
+            if (sm != null && sm.hasDisplayName()) {
+                stationName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(sm.displayName());
+            } else {
+                stationName = toSmallCaps(station.getType().name().replace("_", " "));
+            }
+        }
+        player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Crafting Station") + ": " + C_ORANGE + stationName));
+
+        // Recipe grid
+        player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Recipe") + ":"));
+        ItemStack[] recipe = item.getRecipe();
+        StringBuilder recipeStr = new StringBuilder();
+        for (int i = 0; i < 9; i++) {
+            if (i > 0 && i % 3 == 0) recipeStr.append("\n");
+            ItemStack ingredient = recipe[i];
+            if (ingredient == null || ingredient.getType() == Material.AIR) {
+                recipeStr.append(C_GRAY + "▢ ");
+            } else {
+                recipeStr.append(C_ORANGE + "▣ ");
+            }
+        }
+        player.sendMessage(MM.deserialize(recipeStr.toString().trim()));
+
+        // Back button
+        if (cat != null) {
+            player.sendMessage(Component.empty());
+            String backCmd = "/codex wiki " + cat.getParentCategoryId() + " " + cat.getId();
+            player.sendMessage(MM.deserialize(
+                "<click:run_command:'" + backCmd + "'><hover:show_text:'" + toSmallCaps("Back to items") + "'>" +
+                C_GRAY + "<bold>← " + toSmallCaps("Back") + "</bold></hover></click>"
+            ));
+        }
     }
 
     public static boolean isRuneTypeValidForItem(String runeType, org.bukkit.Material type) {

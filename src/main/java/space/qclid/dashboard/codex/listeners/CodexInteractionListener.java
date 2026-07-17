@@ -59,19 +59,19 @@ public class CodexInteractionListener implements Listener {
     private final CodexCrafting codexCrafting;
     private final CodexPassiveTask codexPassiveTask;
     private final Map<UUID, String> activeMachine;
+    private final Map<UUID, ItemStack[]> lastVoidedItems;
 
-    public CodexInteractionListener(JavaPlugin plugin, DataManager dataManager, CodexManager manager, CodexRegistry registry,
-                                    ArcaneItems arcaneItems, ExplorerItems explorerItems, CodexCrafting codexCrafting,
-                                    CodexPassiveTask codexPassiveTask, Map<UUID, String> activeMachine) {
-        this.plugin = plugin;
-        this.dataManager = dataManager;
-        this.manager = manager;
-        this.registry = registry;
-        this.arcaneItems = arcaneItems;
-        this.explorerItems = explorerItems;
-        this.codexCrafting = codexCrafting;
-        this.codexPassiveTask = codexPassiveTask;
-        this.activeMachine = activeMachine;
+    public CodexInteractionListener(CodexContext ctx) {
+        this.plugin = ctx.plugin();
+        this.dataManager = ctx.dataManager();
+        this.manager = ctx.manager();
+        this.registry = ctx.registry();
+        this.arcaneItems = ctx.arcaneItems();
+        this.explorerItems = ctx.explorerItems();
+        this.codexCrafting = ctx.codexCrafting();
+        this.codexPassiveTask = ctx.codexPassiveTask();
+        this.activeMachine = ctx.activeMachine();
+        this.lastVoidedItems = ctx.lastVoidedItems();
     }
 
     @EventHandler
@@ -231,6 +231,7 @@ public class CodexInteractionListener implements Listener {
 
                         String plateCoordKey = clickedBlock.getWorld().getName() + ":" + clickedBlock.getX() + ":" + clickedBlock.getY() + ":" + clickedBlock.getZ();
                         dataManager.teleportPlates.put(plateCoordKey, wpLoc);
+                        dataManager.markPlatesDirty();
                         dataManager.save();
 
                         player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Successfully linked Waypoint Teleport Plate to: ") + C_GOLD + linkedWp));
@@ -815,6 +816,39 @@ public class CodexInteractionListener implements Listener {
             return;
         }
 
+        if (itemId.equals("explorer.gadgets.void_bag_refund")) {
+            event.setCancelled(true);
+            ItemStack[] backup = lastVoidedItems.remove(player.getUniqueId());
+            if (backup == null) {
+                player.sendMessage(MM.deserialize(C_RED + toSmallCaps("No voided items to recover!")));
+                return;
+            }
+
+            // Consume one refund item
+            org.bukkit.inventory.EquipmentSlot hand = event.getHand();
+            if (item.getAmount() <= 1) {
+                player.getInventory().setItem(hand, null);
+            } else {
+                item.setAmount(item.getAmount() - 1);
+                player.getInventory().setItem(hand, item);
+            }
+
+            // Restore items to inventory or drop on ground
+            int restored = 0;
+            for (ItemStack voided : backup) {
+                if (voided == null || voided.getType() == Material.AIR) continue;
+                java.util.Map<Integer, ItemStack> leftover = player.getInventory().addItem(voided);
+                for (ItemStack drop : leftover.values()) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), drop);
+                }
+                restored++;
+            }
+
+            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1f, 1.5f);
+            player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Restored ") + restored + toSmallCaps(" item(s) from the void!")));
+            return;
+        }
+
         if (itemId.equals("explorer.tools.webber")) {
             event.setCancelled(true);
             if (player.hasCooldown(Material.COBWEB)) return;
@@ -1211,6 +1245,7 @@ public class CodexInteractionListener implements Listener {
             String coordKey = block.getWorld().getName() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();
             if (dataManager.teleportPlates.containsKey(coordKey)) {
                 dataManager.teleportPlates.remove(coordKey);
+                dataManager.markPlatesDirty();
                 dataManager.save();
                 player.sendMessage(MM.deserialize(C_YELLOW + toSmallCaps("Waypoint Teleport Plate link removed.")));
             }

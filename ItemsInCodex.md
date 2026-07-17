@@ -289,9 +289,9 @@ This document lists all custom items, runes, structures, and tools that have bee
 
 ### Melee Weapons
 
-#### Venomous Scythe
+#### Corrosive Scythe
 - **ID**: `arcane.melee.venomous_scythe`
-- **Description**: Stacks poison on hit, deals bonus damage to poisoned targets.
+- **Description**: Degrades enemy armor on each hit, reducing their protection over time.
 
 #### Siphon Blade
 - **ID**: `arcane.melee.siphon_blade`

@@ -162,31 +162,6 @@ public class CodexCategoryGui {
     }
 
     private static boolean hasRequirement(Player player, ItemStack req) {
-        if (req == null) return true;
-        ItemMeta reqMeta = req.getItemMeta();
-        String reqId = null;
-        if (reqMeta != null) {
-            NamespacedKey key = new NamespacedKey(org.bukkit.plugin.java.JavaPlugin.getPlugin(space.qclid.dashboard.DashboardPlugin.class), "item_id");
-            reqId = reqMeta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-        }
-
-        if (reqId == null) {
-            return player.getInventory().containsAtLeast(req, req.getAmount());
-        }
-
-        int found = 0;
-        NamespacedKey key = new NamespacedKey(org.bukkit.plugin.java.JavaPlugin.getPlugin(space.qclid.dashboard.DashboardPlugin.class), "item_id");
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && item.getType() == req.getType()) {
-                ItemMeta meta = item.getItemMeta();
-                if (meta != null) {
-                    String id = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
-                    if (reqId.equals(id)) {
-                        found += item.getAmount();
-                    }
-                }
-            }
-        }
-        return found >= req.getAmount();
+        return space.qclid.dashboard.util.CodexUtil.hasRequirement(player, req);
     }
 }

@@ -394,7 +394,7 @@ public class CodexCrafting {
                             player.damage(0.01); // flash red
                             player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The altar demands blood! You survive by a thread...")));
                         } else {
-                            player.setHealth(0.0); // sacrifice
+                            player.damage(player.getHealth()); // sacrifice — triggers proper death event
                             player.sendMessage(MM.deserialize(C_RED + toSmallCaps("The altar has claimed your soul as sacrifice!")));
                         }
                         return;
