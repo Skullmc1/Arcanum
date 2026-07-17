@@ -19,7 +19,6 @@ import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import space.qclid.dashboard.data.DataManager;
@@ -36,6 +35,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static space.qclid.dashboard.util.TextUtil.*;
+import static space.qclid.dashboard.util.CodexUtil.*;
 
 public class CodexPlayerListener implements Listener {
 
@@ -130,7 +130,6 @@ public class CodexPlayerListener implements Listener {
     }
 
     @EventHandler
-    @SuppressWarnings("removal")
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         ItemStack main = player.getInventory().getItemInMainHand();
@@ -156,12 +155,12 @@ public class CodexPlayerListener implements Listener {
                     Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
                     if (below.getType() == Material.LAVA) {
                         below.setType(Material.BASALT);
-                        below.setMetadata("temp_basalt", new FixedMetadataValue(plugin, true));
+                        setMetadata(below, plugin, "temp_basalt", true);
 
                         plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
-                            if (below.getType() == Material.BASALT && below.hasMetadata("temp_basalt")) {
+                            if (below.getType() == Material.BASALT && hasMetadata(below, plugin, "temp_basalt")) {
                                 below.setType(Material.LAVA);
-                                below.removeMetadata("temp_basalt", plugin);
+                                removeMetadata(below, plugin, "temp_basalt");
                             }
                         }, 200L);
                     }
@@ -179,11 +178,10 @@ public class CodexPlayerListener implements Listener {
                 if (scLvl != null) {
                     double dist = event.getFrom().distance(event.getTo());
                     if (dist > 0.02) {
-                        double charge = player.hasMetadata("static_charge_amount") 
-                                         ? player.getMetadata("static_charge_amount").get(0).asDouble() : 0.0;
+                        double charge = getDoubleMetadata(player, plugin, "static_charge_amount", 0.0);
                         if (charge < 100.0) {
                             charge = Math.min(100.0, charge + dist * (1.5 + scLvl * 0.5));
-                            player.setMetadata("static_charge_amount", new FixedMetadataValue(plugin, charge));
+                            setMetadata(player, plugin, "static_charge_amount", charge);
 
                             if (charge >= 100.0) {
                                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 0.5f, 2f);
@@ -251,10 +249,9 @@ public class CodexPlayerListener implements Listener {
                 NamespacedKey mrKey = new NamespacedKey(plugin, "rune_mach_rush");
                 if (bMeta.getPersistentDataContainer().has(mrKey, PersistentDataType.INTEGER)) {
                     if (player.isSprinting() && player.getVelocity().lengthSquared() > 0.001) {
-                        int ticks = player.hasMetadata("mach_rush_ticks") 
-                                    ? player.getMetadata("mach_rush_ticks").get(0).asInt() : 0;
+                        int ticks = getIntMetadata(player, plugin, "mach_rush_ticks", 0);
                         ticks++;
-                        player.setMetadata("mach_rush_ticks", new FixedMetadataValue(plugin, ticks));
+                        setMetadata(player, plugin, "mach_rush_ticks", ticks);
                         
                         int speedLvl = Math.min(3, ticks / 40); // Max Speed IV (amplifier 3)
                         player.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 40, speedLvl, true, false, true));
@@ -263,7 +260,7 @@ public class CodexPlayerListener implements Listener {
                             player.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, player.getLocation(), 5, 0.3, 0.1, 0.3, 0.05);
                         }
                     } else {
-                        player.removeMetadata("mach_rush_ticks", plugin);
+                        removeMetadata(player, plugin, "mach_rush_ticks");
                     }
                 }
             }
@@ -448,10 +445,9 @@ public class CodexPlayerListener implements Listener {
                 if (meta != null) {
                     NamespacedKey key = new NamespacedKey(plugin, "rune_rift_walk");
                     if (meta.getPersistentDataContainer().has(key, PersistentDataType.INTEGER)) {
-                        long lastSneak = player.hasMetadata("last_sneak_time") 
-                                         ? player.getMetadata("last_sneak_time").get(0).asLong() : 0L;
+                        long lastSneak = getLongMetadata(player, plugin, "last_sneak_time", 0L);
                         long now = System.currentTimeMillis();
-                        player.setMetadata("last_sneak_time", new FixedMetadataValue(plugin, now));
+                        setMetadata(player, plugin, "last_sneak_time", now);
                         
                         if (now - lastSneak > 400 && now - lastSneak < 5000) {
                             player.sendMessage(MM.deserialize(C_GRAY + toSmallCaps("Sneak again quickly to activate Rift Walk.")));
@@ -464,7 +460,7 @@ public class CodexPlayerListener implements Listener {
                             }
                             player.setCooldown(Material.DIAMOND_LEGGINGS, 300); // 15s cooldown
                             
-                            player.setMetadata("rift_walk_active", new FixedMetadataValue(plugin, true));
+                            setMetadata(player, plugin, "rift_walk_active", true);
                             player.setCollidable(false);
                             player.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY, 100, 0));
                             player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.5f);
@@ -472,7 +468,7 @@ public class CodexPlayerListener implements Listener {
                             
                             plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
                                 if (player.isOnline()) {
-                                    player.removeMetadata("rift_walk_active", plugin);
+                                    removeMetadata(player, plugin, "rift_walk_active");
                                     player.setCollidable(true);
                                     player.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY);
                                     player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
@@ -490,7 +486,7 @@ public class CodexPlayerListener implements Listener {
     public void onPlayerAnimation(org.bukkit.event.player.PlayerAnimationEvent event) {
         Player player = event.getPlayer();
         if (event.getAnimationType() == org.bukkit.event.player.PlayerAnimationType.ARM_SWING) {
-            player.removeMetadata("mach_rush_ticks", plugin);
+            removeMetadata(player, plugin, "mach_rush_ticks");
         }
     }
 

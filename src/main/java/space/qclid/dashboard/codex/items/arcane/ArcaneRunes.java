@@ -551,7 +551,9 @@ public class ArcaneRunes {
                     String levelStr = effect.substring(effect.lastIndexOf('_') + 1);
                     level = Integer.parseInt(levelStr);
                     effect = effect.substring(0, effect.lastIndexOf('_'));
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException e) {
+                    plugin.getLogger().fine("Could not parse rune level from " + effect + ": " + e.getMessage());
+                }
             }
             String baseId = id;
             if (id.matches(".+_\\d+")) {

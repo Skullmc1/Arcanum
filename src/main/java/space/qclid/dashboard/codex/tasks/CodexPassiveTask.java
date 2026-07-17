@@ -30,9 +30,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static space.qclid.dashboard.util.CodexUtil.*;
 import static space.qclid.dashboard.util.TextUtil.*;
 
 public class CodexPassiveTask {
+
+    private static final int HARDENED_COAL_1_BURN = 3200;
+    private static final int HARDENED_COAL_2_BURN = 6400;
+    private static final int HARDENED_COAL_MAX_BURN = 12800;
+    private static final int COAL_BLOCK_BURN = 16000;
+    private static final int LAVA_BUCKET_BURN = 20000;
+    private static final int BLAZE_ROD_BURN = 2400;
+    private static final int COAL_BURN = 1600;
+    private static final int STICK_BURN = 100;
+    private static final int DEFAULT_BURN = 300;
 
     private final JavaPlugin plugin;
     private final ArcaneItems arcaneItems;
@@ -194,14 +205,14 @@ public class CodexPassiveTask {
         for (World world : Bukkit.getWorlds()) {
             for (LivingEntity source : world.getEntitiesByClass(LivingEntity.class)) {
                 if (source.getFireTicks() <= 0) {
-                    if (source.hasMetadata("catch_flame_level")) {
-                        source.removeMetadata("catch_flame_level", plugin);
+                    if (hasMetadata(source, plugin, "catch_flame_level")) {
+                        removeMetadata(source, plugin, "catch_flame_level");
                     }
                     continue;
                 }
-                if (!source.hasMetadata("catch_flame_level")) continue;
+                if (!hasMetadata(source, plugin, "catch_flame_level")) continue;
 
-                int level = source.getMetadata("catch_flame_level").get(0).asInt();
+                int level = getIntMetadata(source, plugin, "catch_flame_level", 0);
                 double radius = 1.5;
                 for (Entity nearby : source.getNearbyEntities(radius, radius, radius)) {
                     if (!(nearby instanceof LivingEntity target)) continue;
@@ -214,7 +225,7 @@ public class CodexPassiveTask {
 
                     if (Math.random() <= chance) {
                         target.setFireTicks(100);
-                        target.setMetadata("catch_flame_level", new org.bukkit.metadata.FixedMetadataValue(plugin, level));
+                        setMetadata(target, plugin, "catch_flame_level", level);
                         target.getWorld().spawnParticle(org.bukkit.Particle.FLAME, target.getLocation().add(0, 0.5, 0), 10, 0.2, 0.3, 0.2, 0.05);
                         target.getWorld().playSound(target.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.5f, 1.2f);
                     }
@@ -673,18 +684,18 @@ public class CodexPassiveTask {
     }
 
     private int getFuelBurnTime(ItemStack item) {
-        if (isCustomItem(item, "arcane.materials.hardened_coal_1")) return 3200;
-        if (isCustomItem(item, "arcane.materials.hardened_coal_2")) return 6400;
-        if (isCustomItem(item, "arcane.materials.hardened_coal_max")) return 12800;
+        if (isCustomItem(item, "arcane.materials.hardened_coal_1")) return HARDENED_COAL_1_BURN;
+        if (isCustomItem(item, "arcane.materials.hardened_coal_2")) return HARDENED_COAL_2_BURN;
+        if (isCustomItem(item, "arcane.materials.hardened_coal_max")) return HARDENED_COAL_MAX_BURN;
 
         Material m = item.getType();
         switch (m) {
-            case COAL_BLOCK: return 16000;
-            case LAVA_BUCKET: return 20000;
-            case BLAZE_ROD: return 2400;
-            case COAL: case CHARCOAL: return 1600;
-            case STICK: return 100;
-            default: return 300;
+            case COAL_BLOCK: return COAL_BLOCK_BURN;
+            case LAVA_BUCKET: return LAVA_BUCKET_BURN;
+            case BLAZE_ROD: return BLAZE_ROD_BURN;
+            case COAL: case CHARCOAL: return COAL_BURN;
+            case STICK: return STICK_BURN;
+            default: return DEFAULT_BURN;
         }
     }
 
@@ -734,24 +745,23 @@ public class CodexPassiveTask {
                     boolean isRaining = world.hasStorm();
 
                     if (isDay && !isRaining && loc.getBlock().getLightFromSky() == 15) {
-                        int ticks = itemEntity.getMetadata("sun_exposure_ticks").isEmpty() ? 0 
-                                    : itemEntity.getMetadata("sun_exposure_ticks").get(0).asInt();
+                        int ticks = getIntMetadata(itemEntity, plugin, "sun_exposure_ticks", 0);
                         ticks += 10;
                         if (ticks >= 200) {
                             int amount = stack.getAmount();
                             ItemStack newStack = arcaneItems.sunsBrillianceItem.clone();
                             newStack.setAmount(amount);
                             itemEntity.setItemStack(newStack);
-                            itemEntity.removeMetadata("sun_exposure_ticks", plugin);
+                            removeMetadata(itemEntity, plugin, "sun_exposure_ticks");
 
                             loc.getWorld().playSound(loc, Sound.BLOCK_FIRE_AMBIENT, 1f, 1.2f);
                             loc.getWorld().spawnParticle(org.bukkit.Particle.FLAME, loc, 20, 0.2, 0.2, 0.2, 0.05);
                         } else {
-                            itemEntity.setMetadata("sun_exposure_ticks", new org.bukkit.metadata.FixedMetadataValue(plugin, ticks));
+                            setMetadata(itemEntity, plugin, "sun_exposure_ticks", ticks);
                             loc.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, loc.add(0, 0.1, 0), 2, 0.1, 0.1, 0.1, 0.0);
                         }
                     } else {
-                        itemEntity.removeMetadata("sun_exposure_ticks", plugin);
+                        removeMetadata(itemEntity, plugin, "sun_exposure_ticks");
                     }
                 }
             }

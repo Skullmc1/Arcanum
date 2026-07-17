@@ -3,6 +3,7 @@ package space.qclid.dashboard;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import space.qclid.dashboard.codex.CodexFeature;
 import space.qclid.dashboard.data.DataManager;
 import space.qclid.dashboard.feature.*;
 
@@ -14,6 +15,9 @@ import space.qclid.dashboard.feature.*;
  * All business logic lives in the feature/* and data/* packages.
  */
 public class DashboardPlugin extends JavaPlugin {
+
+    private static final long ACTION_BAR_INTERVAL = 5L;
+    private static final long UPDATE_CHECK_INTERVAL = 6000L;
 
     @Override
     public void onEnable() {
@@ -32,7 +36,8 @@ public class DashboardPlugin extends JavaPlugin {
         PosFeature           posFeature            = new PosFeature();
         LinkedChestFeature   linkedChestFeature    = new LinkedChestFeature(dataManager);
         DeathInventoryFeature deathInventoryFeature = new DeathInventoryFeature(this, dataManager);
-        space.qclid.dashboard.codex.CodexFeature codexFeature = new space.qclid.dashboard.codex.CodexFeature(this, dataManager);
+        NewGadgetsFeature    newGadgetsFeature      = new NewGadgetsFeature(this);
+        this.codexFeature = new CodexFeature(this, dataManager, newGadgetsFeature);
 
         // passive listeners (no commands)
         new ServerPingFeature(this);
@@ -57,11 +62,11 @@ public class DashboardPlugin extends JavaPlugin {
                 actionBarFeature.update(player);
                 navigationFeature.spawnParticles(player);
             }
-        }, 1L, 5L);
+        }, 1L, ACTION_BAR_INTERVAL);
 
         // Auto-update check every 5 minutes (6000 ticks)
         getServer().getGlobalRegionScheduler().runAtFixedRate(this,
-            task -> updateFeature.checkForUpdates(null, true), 1L, 6000L);
+            task -> updateFeature.checkForUpdates(null, true), 1L, UPDATE_CHECK_INTERVAL);
 
         // Store as fields for onDisable access
         this.dataManager    = dataManager;
@@ -69,13 +74,15 @@ public class DashboardPlugin extends JavaPlugin {
     }
 
     // Held purely so onDisable can call save/shutdown
-    private DataManager   dataManager;
-    private UpdateFeature updateFeature;
+    private DataManager    dataManager;
+    private UpdateFeature  updateFeature;
+    private CodexFeature   codexFeature;
 
     @Override
     public void onDisable() {
         if (dataManager   != null) dataManager.save();
         if (updateFeature != null) updateFeature.onShutdown();
+        if (codexFeature  != null) codexFeature.getManager().save();
         getLogger().info("Dashboard disabled.");
     }
 }

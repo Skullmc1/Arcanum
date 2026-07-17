@@ -26,7 +26,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -47,6 +46,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static space.qclid.dashboard.util.TextUtil.*;
+import static space.qclid.dashboard.util.CodexUtil.*;
 
 public class CodexInteractionListener implements Listener {
 
@@ -77,7 +77,7 @@ public class CodexInteractionListener implements Listener {
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
-        if (player.hasMetadata("rift_walk_active")) {
+        if (hasMetadata(player, plugin, "rift_walk_active")) {
             event.setCancelled(true);
             return;
         }
@@ -109,7 +109,7 @@ public class CodexInteractionListener implements Listener {
                 }
             }
         }
-        if (player.hasMetadata("interacted_entity_this_tick")) {
+        if (hasMetadata(player, plugin, "interacted_entity_this_tick")) {
             return;
         }
 
@@ -407,15 +407,15 @@ public class CodexInteractionListener implements Listener {
                     LivingEntity target = null;
                     
                     // 1. Check phalanx_target metadata
-                    if (p.hasMetadata("phalanx_target")) {
+            if (hasMetadata(p, plugin, "phalanx_target")) {
                         try {
-                            UUID targetUuid = UUID.fromString(p.getMetadata("phalanx_target").get(0).asString());
+                            UUID targetUuid = UUID.fromString(getStringMetadata(p, plugin, "phalanx_target"));
                             Entity ent = Bukkit.getEntity(targetUuid);
                             if (ent instanceof LivingEntity le && !le.isDead() && le.getWorld().equals(p.getWorld()) && le.getLocation().distance(p.getLocation()) <= 6.0) {
                                 target = le;
                             }
                         } catch (Exception e) {
-                            // Ignore
+                            plugin.getLogger().warning("Failed to parse phalanx_target metadata: " + e.getMessage());
                         }
                     }
                     
@@ -531,10 +531,10 @@ public class CodexInteractionListener implements Listener {
 
             // Shoot projectile
             Snowball snowball = player.launchProjectile(Snowball.class);
-            snowball.setMetadata("grapple_range", new FixedMetadataValue(plugin, range));
-            snowball.setMetadata("grapple_owner", new FixedMetadataValue(plugin, player.getUniqueId()));
+            setMetadata(snowball, plugin, "grapple_range", range);
+            setMetadata(snowball, plugin, "grapple_owner", player.getUniqueId().toString());
             if (itemId.startsWith("explorer.tools.web_slinger.")) {
-                snowball.setMetadata("web_slinger_projectile", new FixedMetadataValue(plugin, true));
+                setMetadata(snowball, plugin, "web_slinger_projectile", true);
             }
 
             // Spawn invisible leash ArmorStand as the visual wire anchor
@@ -576,7 +576,7 @@ public class CodexInteractionListener implements Listener {
             if (player.hasCooldown(Material.FEATHER)) return;
             setCooldown(player, Material.FEATHER, 300); // 15s cooldown
             Snowball snowball = player.launchProjectile(Snowball.class);
-            snowball.setMetadata("levitation_projectile", new FixedMetadataValue(plugin, true));
+            setMetadata(snowball, plugin, "levitation_projectile", true);
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_PEARL_THROW, 1f, 1.2f);
             return;
         }
@@ -670,7 +670,7 @@ public class CodexInteractionListener implements Listener {
             if (player.hasCooldown(Material.IRON_HOE)) return;
             setCooldown(player, Material.IRON_HOE, 60); // 3s cooldown
             Snowball snowball = player.launchProjectile(Snowball.class);
-            snowball.setMetadata("supplant_projectile", new FixedMetadataValue(plugin, true));
+            setMetadata(snowball, plugin, "supplant_projectile", true);
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_PEARL_THROW, 1f, 1f);
             return;
         }
@@ -855,7 +855,7 @@ public class CodexInteractionListener implements Listener {
             setCooldown(player, Material.COBWEB, 20); // 1s cooldown
 
             Snowball snowball = player.launchProjectile(Snowball.class);
-            snowball.setMetadata("web_projectile", new FixedMetadataValue(plugin, true));
+            setMetadata(snowball, plugin, "web_projectile", true);
             player.playSound(player.getLocation(), Sound.ENTITY_SPIDER_HURT, 1f, 1.5f);
             return;
         }
@@ -1114,9 +1114,9 @@ public class CodexInteractionListener implements Listener {
         if (itemId == null) return;
 
         // Set metadata to prevent double interact
-        player.setMetadata("interacted_entity_this_tick", new FixedMetadataValue(plugin, true));
+        setMetadata(player, plugin, "interacted_entity_this_tick", true);
         plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
-            player.removeMetadata("interacted_entity_this_tick", plugin);
+            removeMetadata(player, plugin, "interacted_entity_this_tick");
         }, 1L);
 
         if (itemId.equals("arcane.materials.empty_vial")) {
@@ -1251,9 +1251,9 @@ public class CodexInteractionListener implements Listener {
             }
         }
 
-        if (block.getType() == Material.COBWEB && block.hasMetadata("temp_web")) {
+        if (block.getType() == Material.COBWEB && hasMetadata(block, plugin, "temp_web")) {
             event.setDropItems(false);
-            block.removeMetadata("temp_web", plugin);
+            removeMetadata(block, plugin, "temp_web");
             return;
         }
 
@@ -1548,8 +1548,8 @@ public class CodexInteractionListener implements Listener {
         Inventory inv = Bukkit.createInventory(null, size, parse(G_GOLD + toSmallCaps("Enchanter")));
 
         for (Enchantment ench : possible) {
-            int currentLevel = held.getType() == Material.ENCHANTED_BOOK
-                    ? ((EnchantmentStorageMeta) held.getItemMeta()).getStoredEnchantLevel(ench)
+            int currentLevel = held.getItemMeta() instanceof EnchantmentStorageMeta esMeta
+                    ? esMeta.getStoredEnchantLevel(ench)
                     : held.getEnchantmentLevel(ench);
             if (currentLevel >= ench.getMaxLevel()) continue;
 
@@ -1576,8 +1576,8 @@ public class CodexInteractionListener implements Listener {
             return;
         }
 
-        Map<Enchantment, Integer> enchants = held.getType() == Material.ENCHANTED_BOOK
-                ? ((EnchantmentStorageMeta) held.getItemMeta()).getStoredEnchants()
+        Map<Enchantment, Integer> enchants = held.getItemMeta() instanceof EnchantmentStorageMeta esMeta
+                ? esMeta.getStoredEnchants()
                 : held.getEnchantments();
 
         if (enchants.isEmpty()) {
@@ -1671,8 +1671,8 @@ public class CodexInteractionListener implements Listener {
             player.getInventory().addItem(new ItemStack(Material.DIAMOND, refund));
             player.playSound(player.getLocation(), Sound.BLOCK_GRINDSTONE_USE, 1f, 1f);
 
-            Map<Enchantment, Integer> remaining = held.getType() == Material.ENCHANTED_BOOK
-                    ? ((EnchantmentStorageMeta) held.getItemMeta()).getStoredEnchants()
+            Map<Enchantment, Integer> remaining = held.getItemMeta() instanceof EnchantmentStorageMeta esMeta
+                    ? esMeta.getStoredEnchants()
                     : held.getEnchantments();
             if (remaining.isEmpty()) player.closeInventory();
             else openDisenchanterGUI(player);
@@ -1919,21 +1919,25 @@ public class CodexInteractionListener implements Listener {
     private boolean isCombatPartner(Player p, LivingEntity le) {
         if (p.equals(le)) return false;
         if (le instanceof Player otherPlayer) {
-            if (otherPlayer.hasMetadata("phalanx_target")) {
+            if (hasMetadata(otherPlayer, plugin, "phalanx_target")) {
                 try {
-                    String targetUuidStr = otherPlayer.getMetadata("phalanx_target").get(0).asString();
+                    String targetUuidStr = getStringMetadata(otherPlayer, plugin, "phalanx_target");
                     if (p.getUniqueId().toString().equals(targetUuidStr)) {
                         return true;
                     }
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to parse phalanx_target metadata: " + e.getMessage());
+                }
             }
-            if (p.hasMetadata("phalanx_target")) {
+            if (hasMetadata(p, plugin, "phalanx_target")) {
                 try {
-                    String targetUuidStr = p.getMetadata("phalanx_target").get(0).asString();
+                    String targetUuidStr = getStringMetadata(p, plugin, "phalanx_target");
                     if (otherPlayer.getUniqueId().toString().equals(targetUuidStr)) {
                         return true;
                     }
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to parse phalanx_target metadata: " + e.getMessage());
+                }
             }
         } else {
             if (le instanceof org.bukkit.entity.Monster) {
@@ -1942,21 +1946,25 @@ public class CodexInteractionListener implements Listener {
             if (le instanceof org.bukkit.entity.Creature creature && p.equals(creature.getTarget())) {
                 return true;
             }
-            if (p.hasMetadata("phalanx_target")) {
+            if (hasMetadata(p, plugin, "phalanx_target")) {
                 try {
-                    String targetUuidStr = p.getMetadata("phalanx_target").get(0).asString();
+                    String targetUuidStr = getStringMetadata(p, plugin, "phalanx_target");
                     if (le.getUniqueId().toString().equals(targetUuidStr)) {
                         return true;
                     }
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to parse phalanx_target metadata: " + e.getMessage());
+                }
             }
-            if (le.hasMetadata("phalanx_target")) {
+            if (hasMetadata(le, plugin, "phalanx_target")) {
                 try {
-                    String targetUuidStr = le.getMetadata("phalanx_target").get(0).asString();
+                    String targetUuidStr = getStringMetadata(le, plugin, "phalanx_target");
                     if (p.getUniqueId().toString().equals(targetUuidStr)) {
                         return true;
                     }
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to parse phalanx_target metadata: " + e.getMessage());
+                }
             }
         }
         return false;

@@ -191,7 +191,9 @@ public class DataManager {
                 }
 
                 playerSettings.put(uuid, s);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to load player settings for " + uuidStr + ": " + e.getMessage());
+            }
         }
     }
 }

@@ -27,7 +27,6 @@ import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -47,6 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static space.qclid.dashboard.util.TextUtil.*;
+import static space.qclid.dashboard.util.CodexUtil.*;
 
 public class CodexCombatListener implements Listener {
 
@@ -76,7 +76,7 @@ public class CodexCombatListener implements Listener {
         if (!(event.getEntity() instanceof Snowball snowball)) return;
 
         // 4. Wand of Levitation Projectile
-        if (snowball.hasMetadata("levitation_projectile")) {
+        if (hasMetadata(snowball, plugin, "levitation_projectile")) {
             if (event.getHitEntity() instanceof LivingEntity target) {
                 target.addPotionEffect(new PotionEffect(PotionEffectType.LEVITATION, 100, 0)); // Levitation I for 5 seconds
                 target.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, target.getLocation().add(0, 1, 0), 20, 0.3, 0.5, 0.3, 0.05);
@@ -87,9 +87,12 @@ public class CodexCombatListener implements Listener {
         }
 
         // 1. Staff of Supplant
-        if (snowball.hasMetadata("supplant_projectile")) {
-            Player player = (Player) snowball.getShooter();
-            if (player != null && player.isOnline() && event.getHitEntity() instanceof LivingEntity target) {
+        if (hasMetadata(snowball, plugin, "supplant_projectile")) {
+            if (!(snowball.getShooter() instanceof Player player) || !player.isOnline()) {
+                snowball.remove();
+                return;
+            }
+            if (event.getHitEntity() instanceof LivingEntity target) {
                 Location playerLoc = player.getLocation();
                 Location targetLoc = target.getLocation();
 
@@ -107,7 +110,7 @@ public class CodexCombatListener implements Listener {
         }
 
         // 2. Webber Projectile
-        if (snowball.hasMetadata("web_projectile")) {
+        if (hasMetadata(snowball, plugin, "web_projectile")) {
             Location loc = null;
             if (event.getHitBlock() != null) {
                 loc = event.getHitBlock().getRelative(event.getHitBlockFace()).getLocation();
@@ -125,9 +128,8 @@ public class CodexCombatListener implements Listener {
         }
 
         // 3. Grappling Hooks & Web Slingers
-        if (snowball.hasMetadata("grapple_range")) {
-            Player player = (Player) snowball.getShooter();
-            if (player == null || !player.isOnline()) return;
+        if (hasMetadata(snowball, plugin, "grapple_range")) {
+            if (!(snowball.getShooter() instanceof Player player) || !player.isOnline()) return;
 
             Location hitLoc = event.getHitBlock() != null
                     ? event.getHitBlock().getLocation().add(0.5, 0.5, 0.5)
@@ -142,7 +144,7 @@ public class CodexCombatListener implements Listener {
                     player.setVelocity(velocity);
                     player.playSound(player.getLocation(), Sound.ENTITY_WIND_CHARGE_THROW, 0.8f, 1.3f);
 
-                    if (snowball.hasMetadata("web_slinger_projectile")) {
+                    if (hasMetadata(snowball, plugin, "web_slinger_projectile")) {
                         trackLanding(player);
                     }
                 }
@@ -153,12 +155,12 @@ public class CodexCombatListener implements Listener {
 
     private void placeTemporaryWeb(org.bukkit.block.Block block, long ticks) {
         block.setType(Material.COBWEB);
-        block.setMetadata("temp_web", new FixedMetadataValue(plugin, true));
+        setMetadata(block, plugin, "temp_web", true);
 
         plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
-            if (block.getType() == Material.COBWEB && block.hasMetadata("temp_web")) {
+            if (block.getType() == Material.COBWEB && hasMetadata(block, plugin, "temp_web")) {
                 block.setType(Material.AIR);
-                block.removeMetadata("temp_web", plugin);
+                removeMetadata(block, plugin, "temp_web");
             }
         }, ticks);
     }
@@ -183,7 +185,6 @@ public class CodexCombatListener implements Listener {
     }
 
     @EventHandler
-    @SuppressWarnings("removal")
     public void onBowShoot(EntityShootBowEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         ItemStack bow = event.getBow();
@@ -194,7 +195,7 @@ public class CodexCombatListener implements Listener {
         NamespacedKey catchFlameKey = new NamespacedKey(plugin, "rune_catch_flame");
         Integer level = meta.getPersistentDataContainer().get(catchFlameKey, PersistentDataType.INTEGER);
         if (level != null && event.getProjectile() instanceof org.bukkit.entity.Arrow arrow) {
-            arrow.setMetadata("catch_flame_level", new FixedMetadataValue(plugin, level));
+            setMetadata(arrow, plugin, "catch_flame_level", level);
         }
 
         // Zephyr
@@ -219,7 +220,7 @@ public class CodexCombatListener implements Listener {
         NamespacedKey hdKey = new NamespacedKey(plugin, "rune_heavy_draw");
         Integer hdLvl = meta.getPersistentDataContainer().get(hdKey, PersistentDataType.INTEGER);
         if (hdLvl != null && event.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
-            player.setMetadata("skip_potion_resistance", new FixedMetadataValue(plugin, true));
+            setMetadata(player, plugin, "skip_potion_resistance", true);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2));
             double multiplier = 1.0 + (hdLvl * 0.10);
             arrow.setDamage(arrow.getDamage() * multiplier);
@@ -228,14 +229,14 @@ public class CodexCombatListener implements Listener {
         // Miasma
         NamespacedKey mKey = new NamespacedKey(plugin, "rune_miasma");
         if (meta.getPersistentDataContainer().has(mKey, PersistentDataType.INTEGER) && event.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
-            arrow.setMetadata("miasma_arrow", new FixedMetadataValue(plugin, true));
+            setMetadata(arrow, plugin, "miasma_arrow", true);
         }
 
         // Brimstone
         NamespacedKey brKey = new NamespacedKey(plugin, "rune_brimstone");
         Integer brLvl = meta.getPersistentDataContainer().get(brKey, PersistentDataType.INTEGER);
         if (brLvl != null && event.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
-            arrow.setMetadata("brimstone_level", new FixedMetadataValue(plugin, brLvl));
+            setMetadata(arrow, plugin, "brimstone_level", brLvl);
         }
 
         // Apollo's Ray
@@ -258,7 +259,7 @@ public class CodexCombatListener implements Listener {
                 if (ray != null && ray.getHitEntity() instanceof LivingEntity le) {
                     le.damage(12.0, player);
                     le.setFireTicks(200);
-                    le.setMetadata("holy_fire", new FixedMetadataValue(plugin, true));
+                    setMetadata(le, plugin, "holy_fire", true);
                     le.getWorld().playSound(le.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_IMPACT, 1f, 1.5f);
                     le.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, le.getLocation().add(0, 1, 0), 15, 0.2, 0.2, 0.2, 0.1);
                 }
@@ -269,13 +270,13 @@ public class CodexCombatListener implements Listener {
         // Trinity's Well
         NamespacedKey twKey = new NamespacedKey(plugin, "rune_trinitys_well");
         if (meta.getPersistentDataContainer().has(twKey, PersistentDataType.INTEGER) && event.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
-            arrow.setMetadata("trinitys_well_arrow", new FixedMetadataValue(plugin, true));
+            setMetadata(arrow, plugin, "trinitys_well_arrow", true);
         }
 
         // Styx's Toll
         NamespacedKey stKey = new NamespacedKey(plugin, "rune_styxs_toll");
         if (meta.getPersistentDataContainer().has(stKey, PersistentDataType.INTEGER) && event.getProjectile() instanceof org.bukkit.entity.AbstractArrow arrow) {
-            arrow.setMetadata("styxs_toll_arrow", new FixedMetadataValue(plugin, true));
+            setMetadata(arrow, plugin, "styxs_toll_arrow", true);
         }
 
         // Shrapnel Shot
@@ -311,35 +312,34 @@ public class CodexCombatListener implements Listener {
                 org.bukkit.entity.Arrow extraArrow = player.launchProjectile(org.bukkit.entity.Arrow.class, spread);
                 extraArrow.setPierceLevel(2);
                 extraArrow.setKnockbackStrength(2);
-                extraArrow.setMetadata("shrapnel_arrow", new FixedMetadataValue(plugin, true));
+                setMetadata(extraArrow, plugin, "shrapnel_arrow", true);
             }
             player.getWorld().playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST, 1f, 1.2f);
         }
     }
 
     @EventHandler
-    @SuppressWarnings("removal")
     public void onEntityDamage(EntityDamageByEntityEvent event) {
         // Capture phalanx targets
         if (event.getEntity() instanceof Player victim) {
             if (event.getDamager() instanceof LivingEntity attacker) {
-                victim.setMetadata("phalanx_target", new FixedMetadataValue(plugin, attacker.getUniqueId().toString()));
+                setMetadata(victim, plugin, "phalanx_target", attacker.getUniqueId().toString());
             } else if (event.getDamager() instanceof org.bukkit.entity.Projectile proj && proj.getShooter() instanceof LivingEntity attacker) {
-                victim.setMetadata("phalanx_target", new FixedMetadataValue(plugin, attacker.getUniqueId().toString()));
+                setMetadata(victim, plugin, "phalanx_target", attacker.getUniqueId().toString());
             }
         }
         if (event.getDamager() instanceof Player damager && event.getEntity() instanceof LivingEntity victim) {
-            damager.setMetadata("phalanx_target", new FixedMetadataValue(plugin, victim.getUniqueId().toString()));
+            setMetadata(damager, plugin, "phalanx_target", victim.getUniqueId().toString());
         }
         if (event.getDamager() instanceof org.bukkit.entity.Projectile proj && proj.getShooter() instanceof Player shooter && event.getEntity() instanceof LivingEntity victim) {
-            shooter.setMetadata("phalanx_target", new FixedMetadataValue(plugin, victim.getUniqueId().toString()));
+            setMetadata(shooter, plugin, "phalanx_target", victim.getUniqueId().toString());
         }
 
         // Redirection check (if player is target)
         if (event.getEntity() instanceof Player player) {
-            player.setMetadata("last_combat_time", new FixedMetadataValue(plugin, System.currentTimeMillis()));
+            setMetadata(player, plugin, "last_combat_time", System.currentTimeMillis());
             if (event.getDamager() instanceof Player attacker) {
-                attacker.setMetadata("last_combat_time", new FixedMetadataValue(plugin, System.currentTimeMillis()));
+                setMetadata(attacker, plugin, "last_combat_time", System.currentTimeMillis());
             }
 
             // Warding Halo
@@ -349,11 +349,11 @@ public class CodexCombatListener implements Listener {
                 if (cMeta != null) {
                     NamespacedKey whKey = new NamespacedKey(plugin, "rune_warding_halo");
                     if (cMeta.getPersistentDataContainer().has(whKey, PersistentDataType.INTEGER)) {
-                        int charges = player.hasMetadata("warding_halo_charges") 
-                                      ? player.getMetadata("warding_halo_charges").get(0).asInt() : 3;
+                        int charges = hasMetadata(player, plugin, "warding_halo_charges") 
+                                      ? getIntMetadata(player, plugin, "warding_halo_charges", 0) : 3;
                         if (charges > 0) {
                             charges--;
-                            player.setMetadata("warding_halo_charges", new FixedMetadataValue(plugin, charges));
+                            setMetadata(player, plugin, "warding_halo_charges", charges);
                             event.setCancelled(true);
                             player.getWorld().playSound(player.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.5f);
                             player.getWorld().spawnParticle(org.bukkit.Particle.GUST, player.getLocation().add(0, 1, 0), 10, 0.5, 0.5, 0.5, 0.05);
@@ -455,9 +455,11 @@ public class CodexCombatListener implements Listener {
                             org.bukkit.projectiles.ProjectileSource source = proj.getShooter();
                             if (source instanceof LivingEntity shooter) {
                                 org.bukkit.util.Vector returnVec = shooter.getEyeLocation().toVector().subtract(proj.getLocation().toVector()).normalize().multiply(1.5);
-                                org.bukkit.entity.Projectile reflected = (org.bukkit.entity.Projectile) proj.getWorld().spawnEntity(proj.getLocation(), proj.getType());
-                                reflected.setShooter(defender);
-                                reflected.setVelocity(returnVec);
+                                org.bukkit.entity.Entity spawned = proj.getWorld().spawnEntity(proj.getLocation(), proj.getType());
+                                if (spawned instanceof org.bukkit.entity.Projectile reflected) {
+                                    reflected.setShooter(defender);
+                                    reflected.setVelocity(returnVec);
+                                }
 
                                 defender.playSound(defender.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.8f);
                                 defender.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, proj.getLocation(), 10, 0.2, 0.2, 0.2, 0.1);
@@ -544,13 +546,13 @@ public class CodexCombatListener implements Listener {
             if (event.getDamager() instanceof org.bukkit.entity.Arrow arrow) {
                 Player shooterPlayer = arrow.getShooter() instanceof Player ? (Player) arrow.getShooter() : null;
                 
-                if (arrow.hasMetadata("catch_flame_level")) {
-                    int level = arrow.getMetadata("catch_flame_level").get(0).asInt();
-                    targetEntity.setMetadata("catch_flame_level", new FixedMetadataValue(plugin, level));
+                if (hasMetadata(arrow, plugin, "catch_flame_level")) {
+                    int level = getIntMetadata(arrow, plugin, "catch_flame_level", 0);
+                    setMetadata(targetEntity, plugin, "catch_flame_level", level);
                 }
 
                 // Miasma arrow hit
-                if (arrow.hasMetadata("miasma_arrow")) {
+                if (hasMetadata(arrow, plugin, "miasma_arrow")) {
                     Location hitLoc = targetEntity.getLocation();
                     hitLoc.getWorld().playSound(hitLoc, Sound.ENTITY_EGG_THROW, 1f, 0.5f);
                     int[] tick = new int[]{0};
@@ -579,8 +581,8 @@ public class CodexCombatListener implements Listener {
                 }
 
                 // Brimstone arrow hit
-                if (arrow.hasMetadata("brimstone_level")) {
-                    int lvl = arrow.getMetadata("brimstone_level").get(0).asInt();
+                if (hasMetadata(arrow, plugin, "brimstone_level")) {
+                    int lvl = getIntMetadata(arrow, plugin, "brimstone_level", 0);
                     double radius = lvl == 1 ? 3.0 : 5.0;
                     Location hitLoc = targetEntity.getLocation();
                     hitLoc.getWorld().playSound(hitLoc, Sound.ENTITY_GENERIC_EXPLODE, 1f, 0.8f);
@@ -599,7 +601,7 @@ public class CodexCombatListener implements Listener {
                 }
 
                 // Trinity's Well arrow hit
-                if (arrow.hasMetadata("trinitys_well_arrow") && shooterPlayer != null) {
+                if (hasMetadata(arrow, plugin, "trinitys_well_arrow") && shooterPlayer != null) {
                     if (targetEntity instanceof Player hitPlayer) {
                         event.setCancelled(true);
                         double maxHealth = hitPlayer.getAttribute(Attribute.MAX_HEALTH).getValue();
@@ -607,26 +609,26 @@ public class CodexCombatListener implements Listener {
                         hitPlayer.getWorld().spawnParticle(org.bukkit.Particle.HEART, hitPlayer.getLocation().add(0, 1, 0), 5, 0.2, 0.2, 0.2, 0.05);
                         hitPlayer.getWorld().playSound(hitPlayer.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.5f);
                     } else {
-                        targetEntity.setMetadata("trinity_marked", new FixedMetadataValue(plugin, true));
+                        setMetadata(targetEntity, plugin, "trinity_marked", true);
                         targetEntity.getWorld().spawnParticle(org.bukkit.Particle.GLOW, targetEntity.getLocation().add(0, 1, 0), 10, 0.3, 0.5, 0.3, 0.02);
                         plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
                             if (targetEntity.isValid()) {
-                                targetEntity.removeMetadata("trinity_marked", plugin);
+                                removeMetadata(targetEntity, plugin, "trinity_marked");
                             }
                         }, 100L);
                     }
                 }
 
                 // Styx's Toll arrow hit
-                if (arrow.hasMetadata("styxs_toll_arrow")) {
+                if (hasMetadata(arrow, plugin, "styxs_toll_arrow")) {
                     targetEntity.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 9));
-                    targetEntity.setMetadata("rooted", new FixedMetadataValue(plugin, true));
+                    setMetadata(targetEntity, plugin, "rooted", true);
                     targetEntity.getWorld().playSound(targetEntity.getLocation(), Sound.BLOCK_ANVIL_PLACE, 0.6f, 1.8f);
                     targetEntity.getWorld().spawnParticle(org.bukkit.Particle.CRIT, targetEntity.getLocation(), 20, 0.5, 0.1, 0.5, 0.02);
                     
                     plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
                         if (targetEntity.isValid()) {
-                            targetEntity.removeMetadata("rooted", plugin);
+                            removeMetadata(targetEntity, plugin, "rooted");
                         }
                     }, 60L);
                 }
@@ -638,10 +640,10 @@ public class CodexCombatListener implements Listener {
         if (!(event.getEntity() instanceof LivingEntity target)) return;
 
         // Static Charge attack boost check
-        if (player.hasMetadata("static_charge_amount")) {
-            double charge = player.getMetadata("static_charge_amount").get(0).asDouble();
+        if (hasMetadata(player, plugin, "static_charge_amount")) {
+            double charge = getDoubleMetadata(player, plugin, "static_charge_amount", 0.0);
             if (charge >= 100.0) {
-                player.removeMetadata("static_charge_amount", plugin);
+                removeMetadata(player, plugin, "static_charge_amount");
                 event.setDamage(event.getDamage() * 1.5);
                 target.getWorld().playSound(target.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.5f, 1.8f);
                 target.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, target.getLocation().add(0, 1, 0), 15, 0.3, 0.5, 0.3, 0.1);
@@ -683,7 +685,7 @@ public class CodexCombatListener implements Listener {
                 }
 
                 // Trinity's Well mark leech
-                if (target.hasMetadata("trinity_marked")) {
+                if (hasMetadata(target, plugin, "trinity_marked")) {
                     double leechDmg = event.getFinalDamage();
                     double heal = leechDmg * 0.20;
                     double maxHp = player.getAttribute(Attribute.MAX_HEALTH).getValue();
@@ -719,15 +721,15 @@ public class CodexCombatListener implements Listener {
                                     return;
                                 }
                                 Entity currentSec = Bukkit.getEntity(secUuid);
-                                if (currentSec == null || !currentSec.isValid() || currentSec.isDead()) {
+                                if (!(currentSec instanceof LivingEntity livingSec) || livingSec.isDead()) {
                                     task.cancel();
                                     return;
                                 }
-                                Location targetLoc = ((LivingEntity) currentSec).getEyeLocation();
+                                Location targetLoc = livingSec.getEyeLocation();
                                 double dist = start.distance(targetLoc);
                                 if (dist <= 0.8) {
                                     task.cancel();
-                                    ((LivingEntity) currentSec).damage(5.0, player);
+                                    livingSec.damage(5.0, player);
                                     currentSec.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, targetLoc, 10, 0.2, 0.2, 0.2, 0.05);
                                     currentSec.getWorld().playSound(targetLoc, Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8f, 1.2f);
                                     return;
@@ -757,7 +759,7 @@ public class CodexCombatListener implements Listener {
                 if (meta.getPersistentDataContainer().has(ajKey, PersistentDataType.INTEGER)) {
                     AttributeInstance maxHealthAttr = target.getAttribute(Attribute.MAX_HEALTH);
                     if (maxHealthAttr != null && (target.getHealth() / maxHealthAttr.getValue()) <= 0.20) {
-                        target.setMetadata("anubis_execute", new FixedMetadataValue(plugin, true));
+                        setMetadata(target, plugin, "anubis_execute", true);
                         event.setDamage(99999.0);
                         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.8f);
                         target.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, target.getLocation().add(0, 1, 0), 20, 0.3, 0.5, 0.3, 0.1);
@@ -767,23 +769,23 @@ public class CodexCombatListener implements Listener {
                 // Cerberus' Maw
                 NamespacedKey cmKey = new NamespacedKey(plugin, "rune_cerberus_maw");
                 if (meta.getPersistentDataContainer().has(cmKey, PersistentDataType.INTEGER)) {
-                    target.setMetadata("cerberus_bleeding", new FixedMetadataValue(plugin, true));
-                    
-                    final int runId = target.hasMetadata("cerberus_bleed_run") 
-                                      ? target.getMetadata("cerberus_bleed_run").get(0).asInt() + 1 : 1;
-                    target.setMetadata("cerberus_bleed_run", new FixedMetadataValue(plugin, runId));
+                    setMetadata(target, plugin, "cerberus_bleeding", true);
+
+                    final int runId = hasMetadata(target, plugin, "cerberus_bleed_run")
+                                      ? getIntMetadata(target, plugin, "cerberus_bleed_run", 0) + 1 : 1;
+                    setMetadata(target, plugin, "cerberus_bleed_run", runId);
                     
                     int[] tick = new int[]{0};
                     plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, t -> {
                         if (!target.isValid() || target.isDead() || tick[0] >= 5) {
                             t.cancel();
                             if (target.isValid()) {
-                                target.removeMetadata("cerberus_bleeding", plugin);
-                                target.removeMetadata("cerberus_bleed_run", plugin);
+                                removeMetadata(target, plugin, "cerberus_bleeding");
+                                removeMetadata(target, plugin, "cerberus_bleed_run");
                             }
                             return;
                         }
-                        if (target.hasMetadata("cerberus_bleed_run") && target.getMetadata("cerberus_bleed_run").get(0).asInt() != runId) {
+                        if (hasMetadata(target, plugin, "cerberus_bleed_run") && getIntMetadata(target, plugin, "cerberus_bleed_run", 0) != runId) {
                             t.cancel();
                             return;
                         }
@@ -833,7 +835,7 @@ public class CodexCombatListener implements Listener {
                         event.setDamage(event.getDamage() + 6.0);
                         
                         if (target.getCategory() == org.bukkit.entity.EntityCategory.UNDEAD) {
-                            target.setMetadata("jupiter_smite_vaporize", new FixedMetadataValue(plugin, true));
+                            setMetadata(target, plugin, "jupiter_smite_vaporize", true);
                             event.setDamage(event.getDamage() * 2.0);
                         }
                     }
@@ -855,7 +857,7 @@ public class CodexCombatListener implements Listener {
                 NamespacedKey catchFlameKey = new NamespacedKey(plugin, "rune_catch_flame");
                 Integer catchFlameLvl = meta.getPersistentDataContainer().get(catchFlameKey, PersistentDataType.INTEGER);
                 if (catchFlameLvl != null) {
-                    target.setMetadata("catch_flame_level", new FixedMetadataValue(plugin, catchFlameLvl));
+                    setMetadata(target, plugin, "catch_flame_level", catchFlameLvl);
                 }
 
                 // 2. Corrosive Scythe
@@ -880,24 +882,24 @@ public class CodexCombatListener implements Listener {
                     NamespacedKey csKey = new NamespacedKey(plugin, "rune_corrosive_slash");
                     Integer csLvl = meta.getPersistentDataContainer().get(csKey, PersistentDataType.INTEGER);
                     if (csLvl != null) {
-                        int currentStacks = target.hasMetadata("corrosive_slash_stacks") 
-                                            ? target.getMetadata("corrosive_slash_stacks").get(0).asInt() : 0;
+                        int currentStacks = hasMetadata(target, plugin, "corrosive_slash_stacks") 
+                                            ? getIntMetadata(target, plugin, "corrosive_slash_stacks", 0) : 0;
                         int newStacks = Math.min(5, currentStacks + 1);
-                        target.setMetadata("corrosive_slash_stacks", new FixedMetadataValue(plugin, newStacks));
-                        target.setMetadata("corrosive_slash_level", new FixedMetadataValue(plugin, csLvl));
+                        setMetadata(target, plugin, "corrosive_slash_stacks", newStacks);
+                        setMetadata(target, plugin, "corrosive_slash_level", csLvl);
 
                         int duration = csLvl * 50; // 2.5s per level in ticks
-                        final int runId = target.hasMetadata("corrosive_slash_run") 
-                                          ? target.getMetadata("corrosive_slash_run").get(0).asInt() + 1 : 1;
-                        target.setMetadata("corrosive_slash_run", new FixedMetadataValue(plugin, runId));
+                        final int runId = hasMetadata(target, plugin, "corrosive_slash_run") 
+                                          ? getIntMetadata(target, plugin, "corrosive_slash_run", 0) + 1 : 1;
+                        setMetadata(target, plugin, "corrosive_slash_run", runId);
 
                         target.getWorld().spawnParticle(org.bukkit.Particle.TRIAL_SPAWNER_DETECTION, target.getLocation().add(0, 1, 0), 5, 0.2, 0.3, 0.2, 0.0);
 
                         plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
-                            if (target.isValid() && target.hasMetadata("corrosive_slash_run") && target.getMetadata("corrosive_slash_run").get(0).asInt() == runId) {
-                                target.removeMetadata("corrosive_slash_stacks", plugin);
-                                target.removeMetadata("corrosive_slash_level", plugin);
-                                target.removeMetadata("corrosive_slash_run", plugin);
+                            if (target.isValid() && hasMetadata(target, plugin, "corrosive_slash_run") && getIntMetadata(target, plugin, "corrosive_slash_run", 0) == runId) {
+                                removeMetadata(target, plugin, "corrosive_slash_stacks");
+                                removeMetadata(target, plugin, "corrosive_slash_level");
+                                removeMetadata(target, plugin, "corrosive_slash_run");
                             }
                         }, duration);
                     }
@@ -907,10 +909,10 @@ public class CodexCombatListener implements Listener {
                 if (weapon.getType().name().contains("SWORD")) {
                     NamespacedKey scrKey = new NamespacedKey(plugin, "rune_scorch");
                     if (meta.getPersistentDataContainer().has(scrKey, PersistentDataType.INTEGER)) {
-                        int currentStacks = target.hasMetadata("scorch_stacks") 
-                                            ? target.getMetadata("scorch_stacks").get(0).asInt() : 0;
+                        int currentStacks = hasMetadata(target, plugin, "scorch_stacks") 
+                                            ? getIntMetadata(target, plugin, "scorch_stacks", 0) : 0;
                         int newStacks = Math.min(10, currentStacks + 1);
-                        target.setMetadata("scorch_stacks", new FixedMetadataValue(plugin, newStacks));
+                        setMetadata(target, plugin, "scorch_stacks", newStacks);
 
                         AttributeInstance armorAttr = target.getAttribute(org.bukkit.attribute.Attribute.ARMOR);
                         if (armorAttr != null) {
@@ -923,14 +925,14 @@ public class CodexCombatListener implements Listener {
                         target.damage(1.0); // true fire damage tick
 
                         int duration = 160; // 8s
-                        final int runId = target.hasMetadata("scorch_run") 
-                                          ? target.getMetadata("scorch_run").get(0).asInt() + 1 : 1;
-                        target.setMetadata("scorch_run", new FixedMetadataValue(plugin, runId));
+                        final int runId = hasMetadata(target, plugin, "scorch_run") 
+                                          ? getIntMetadata(target, plugin, "scorch_run", 0) + 1 : 1;
+                        setMetadata(target, plugin, "scorch_run", runId);
 
                         plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
-                            if (target.isValid() && target.hasMetadata("scorch_run") && target.getMetadata("scorch_run").get(0).asInt() == runId) {
-                                target.removeMetadata("scorch_stacks", plugin);
-                                target.removeMetadata("scorch_run", plugin);
+                            if (target.isValid() && hasMetadata(target, plugin, "scorch_run") && getIntMetadata(target, plugin, "scorch_run", 0) == runId) {
+                                removeMetadata(target, plugin, "scorch_stacks");
+                                removeMetadata(target, plugin, "scorch_run");
                                 removeArmorReduction(target, "scorch");
                             }
                         }, duration);
@@ -986,7 +988,7 @@ public class CodexCombatListener implements Listener {
                             s.setCanPickupItems(false);
                             s.setItemInHand(weaponCopy);
                             s.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.GLOWING, 40, 0, false, false));
-                            s.setMetadata("phantom_knife", new FixedMetadataValue(plugin, true));
+                            setMetadata(s, plugin, "phantom_knife", true);
                         });
                         target.getWorld().playSound(behind, Sound.ENTITY_PHANTOM_AMBIENT, 0.5f, 1.2f);
                         target.getWorld().spawnParticle(org.bukkit.Particle.PORTAL, behind, 15, 0.2, 0.5, 0.2, 0.05);
@@ -1035,14 +1037,14 @@ public class CodexCombatListener implements Listener {
                 NamespacedKey bleedKey = new NamespacedKey(plugin, "rune_bleed");
                 Integer bleedLvl = meta.getPersistentDataContainer().get(bleedKey, PersistentDataType.INTEGER);
                 if (bleedLvl != null) {
-                    int bleedStacks = target.hasMetadata("bleed_stacks") 
-                                      ? target.getMetadata("bleed_stacks").get(0).asInt() : 0;
+                    int bleedStacks = hasMetadata(target, plugin, "bleed_stacks") 
+                                      ? getIntMetadata(target, plugin, "bleed_stacks", 0) : 0;
                     bleedStacks = Math.min(8, bleedStacks + 1);
-                    target.setMetadata("bleed_stacks", new FixedMetadataValue(plugin, bleedStacks));
+                    setMetadata(target, plugin, "bleed_stacks", bleedStacks);
 
-                    final int runId = target.hasMetadata("bleed_run") 
-                                      ? target.getMetadata("bleed_run").get(0).asInt() + 1 : 1;
-                    target.setMetadata("bleed_run", new FixedMetadataValue(plugin, runId));
+                    final int runId = hasMetadata(target, plugin, "bleed_run") 
+                                      ? getIntMetadata(target, plugin, "bleed_run", 0) + 1 : 1;
+                    setMetadata(target, plugin, "bleed_run", runId);
 
                     final int finalLvl = bleedLvl;
                     final int finalStacks = bleedStacks;
@@ -1051,12 +1053,12 @@ public class CodexCombatListener implements Listener {
                         if (!target.isValid() || target.isDead() || tick[0] >= 5) {
                             t.cancel();
                             if (target.isValid()) {
-                                target.removeMetadata("bleed_stacks", plugin);
-                                target.removeMetadata("bleed_run", plugin);
+                                removeMetadata(target, plugin, "bleed_stacks");
+                                removeMetadata(target, plugin, "bleed_run");
                             }
                             return;
                         }
-                        if (target.hasMetadata("bleed_run") && target.getMetadata("bleed_run").get(0).asInt() != runId) {
+                        if (hasMetadata(target, plugin, "bleed_run") && getIntMetadata(target, plugin, "bleed_run", 0) != runId) {
                             t.cancel();
                             return;
                         }
@@ -1094,9 +1096,9 @@ public class CodexCombatListener implements Listener {
         }
 
         // Corrosive Slash — multiply damage based on stacks on target
-        if (target.hasMetadata("corrosive_slash_stacks")) {
-            int stacks = target.getMetadata("corrosive_slash_stacks").get(0).asInt();
-            int csLvl = target.getMetadata("corrosive_slash_level").get(0).asInt();
+        if (hasMetadata(target, plugin, "corrosive_slash_stacks")) {
+            int stacks = getIntMetadata(target, plugin, "corrosive_slash_stacks", 0);
+            int csLvl = getIntMetadata(target, plugin, "corrosive_slash_level", 0);
             double multiplier = 1.0 + stacks * csLvl * 0.1;
             event.setDamage(event.getDamage() * multiplier);
         }
@@ -1127,7 +1129,7 @@ public class CodexCombatListener implements Listener {
         LivingEntity entity = event.getEntity();
 
         // Anubis' Judgment execute loot/XP doubling
-        if (entity.hasMetadata("anubis_execute")) {
+        if (hasMetadata(entity, plugin, "anubis_execute")) {
             List<ItemStack> extraDrops = new ArrayList<>();
             for (ItemStack drop : event.getDrops()) {
                 extraDrops.add(drop.clone());
@@ -1139,7 +1141,7 @@ public class CodexCombatListener implements Listener {
         }
 
         // Cerberus' Maw blood orb drop
-        if (entity.hasMetadata("cerberus_bleeding")) {
+        if (hasMetadata(entity, plugin, "cerberus_bleeding")) {
             ItemStack bloodOrb = arcaneItems.getCustomItem("arcane.materials.blood_orb");
             if (bloodOrb != null) {
                 entity.getWorld().dropItemNaturally(entity.getLocation(), bloodOrb.clone());
@@ -1239,8 +1241,8 @@ public class CodexCombatListener implements Listener {
             }
             
             if (hasGrace) {
-                long cooldown = player.hasMetadata("valkyrie_grace_cooldown") 
-                                 ? player.getMetadata("valkyrie_grace_cooldown").get(0).asLong() : 0L;
+                long cooldown = hasMetadata(player, plugin, "valkyrie_grace_cooldown") 
+                                 ? getLongMetadata(player, plugin, "valkyrie_grace_cooldown", 0L) : 0L;
                 if (System.currentTimeMillis() >= cooldown) {
                     event.setCancelled(true);
                     player.setHealth(2.0); // 1 heart
@@ -1261,7 +1263,7 @@ public class CodexCombatListener implements Listener {
                         }
                     }
                     
-                    player.setMetadata("valkyrie_grace_cooldown", new FixedMetadataValue(plugin, System.currentTimeMillis() + 300000));
+                    setMetadata(player, plugin, "valkyrie_grace_cooldown", System.currentTimeMillis() + 300000);
                     player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Valkyrie's Grace saved you from death!")));
                     return;
                 }
@@ -1288,7 +1290,7 @@ public class CodexCombatListener implements Listener {
 
     @EventHandler
     public void onDummyDamage(org.bukkit.event.entity.EntityDamageEvent event) {
-        if (!event.getEntity().hasMetadata("codex_dummy")) return;
+        if (!hasMetadata(event.getEntity(), plugin, "codex_dummy")) return;
         event.setCancelled(true);
 
         double dmg = event.getFinalDamage();

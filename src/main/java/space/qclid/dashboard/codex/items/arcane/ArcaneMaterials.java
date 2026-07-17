@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import static space.qclid.dashboard.util.TextUtil.*;
+import static space.qclid.dashboard.util.CodexUtil.setSkullTexture;
 
 public class ArcaneMaterials {
 
@@ -497,13 +498,7 @@ public class ArcaneMaterials {
             }
             meta.lore(lore);
 
-            try {
-                PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID());
-                PlayerTextures textures = profile.getTextures();
-                textures.setSkin(new URL(skinUrl));
-                profile.setTextures(textures);
-                meta.setOwnerProfile(profile);
-            } catch (Exception ignored) {}
+            setSkullTexture(meta, skinUrl, plugin);
 
             item.setItemMeta(meta);
         }

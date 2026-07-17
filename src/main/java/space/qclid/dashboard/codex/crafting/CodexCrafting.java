@@ -20,6 +20,7 @@ import space.qclid.dashboard.codex.items.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static space.qclid.dashboard.util.CodexUtil.*;
 import static space.qclid.dashboard.util.TextUtil.*;
 
 public class CodexCrafting {
@@ -494,7 +495,7 @@ public class CodexCrafting {
 
         final org.bukkit.entity.LivingEntity sacrifice = targetMob;
         player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("The heavens align... The sacrifice begins!")));
-        sacrifice.setMetadata("altar_sacrifice", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+        setMetadata(sacrifice, plugin, "altar_sacrifice", true);
 
         plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
             if (!sacrifice.isValid() || sacrifice.isDead()) {

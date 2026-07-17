@@ -34,6 +34,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import space.qclid.dashboard.codex.core.CodexCategory;
 import space.qclid.dashboard.codex.core.CodexItem;
 
+import static space.qclid.dashboard.util.CodexUtil.*;
 import static space.qclid.dashboard.util.TextUtil.*;
 
 public class NewGadgetsFeature implements Listener {
@@ -462,7 +463,7 @@ public class NewGadgetsFeature implements Listener {
         if (player.hasCooldown(holographicDecoy.getType())) return;
 
         Snowball projectile = player.launchProjectile(Snowball.class);
-        projectile.setMetadata("decoy_projectile", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+        setMetadata(projectile, plugin, "decoy_projectile", true);
         projectile.setVelocity(player.getLocation().getDirection().multiply(1.5));
         player.setCooldown(holographicDecoy.getType(), 400);
         consumeItem(player);
@@ -471,7 +472,7 @@ public class NewGadgetsFeature implements Listener {
     @EventHandler
     public void onDecoyHit(ProjectileHitEvent event) {
         if (!(event.getEntity() instanceof Snowball snowball)) return;
-        if (!snowball.hasMetadata("decoy_projectile")) return;
+        if (!hasMetadata(snowball, plugin, "decoy_projectile")) return;
 
         Location loc = snowball.getLocation();
         if (event.getHitBlock() != null) {
@@ -504,7 +505,7 @@ public class NewGadgetsFeature implements Listener {
             decoy.getEquipment().setItemInMainHand(new ItemStack(Material.IRON_SWORD));
         }
 
-        decoy.setMetadata("decoy", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+        setMetadata(decoy, plugin, "decoy", true);
 
         // Flash animation before removal
         final int[] decoyTicks = {0};
@@ -705,13 +706,13 @@ public class NewGadgetsFeature implements Listener {
                     for (int i = 0; i < 2; i++) {
                         Location portalLoc = (i == 0) ? wh.anchorA : wh.anchorB;
                         Location dest = (i == 0) ? wh.anchorB : wh.anchorA;
-                        if (ploc.distance(portalLoc) < 2.0 && p.hasMetadata("wormhole_cooldown_" + uid)) {
+                        if (ploc.distance(portalLoc) < 2.0 && hasMetadata(p, plugin, "wormhole_cooldown_" + uid)) {
                             p.teleport(dest);
-                            p.setMetadata("wormhole_cooldown_" + uid, new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+                            setMetadata(p, plugin, "wormhole_cooldown_" + uid, true);
                             p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
                             // Remove cooldown after 2s
                             plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, t -> {
-                                p.removeMetadata("wormhole_cooldown_" + uid, plugin);
+                                removeMetadata(p, plugin, "wormhole_cooldown_" + uid);
                             }, 40L);
                         }
                     }

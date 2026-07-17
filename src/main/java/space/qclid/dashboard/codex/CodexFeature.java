@@ -11,7 +11,6 @@ import org.bukkit.Location;
 import org.bukkit.entity.Zombie;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
@@ -22,6 +21,7 @@ import space.qclid.dashboard.codex.gui.CodexGuiListener;
 import space.qclid.dashboard.codex.gui.CodexMainGui;
 import space.qclid.dashboard.data.DataManager;
 import space.qclid.dashboard.feature.NewGadgetsFeature;
+import static space.qclid.dashboard.util.CodexUtil.setMetadata;
 
 import space.qclid.dashboard.codex.core.*;
 import space.qclid.dashboard.codex.items.*;
@@ -54,7 +54,7 @@ public class CodexFeature {
     private final java.util.Map<java.util.UUID, String> activeMachine = new java.util.HashMap<>();
     private final java.util.Map<java.util.UUID, org.bukkit.inventory.ItemStack[]> lastVoidedItems = new java.util.HashMap<>();
 
-    public CodexFeature(JavaPlugin plugin, DataManager dataManager) {
+    public CodexFeature(JavaPlugin plugin, DataManager dataManager, NewGadgetsFeature newGadgets) {
         this.plugin = plugin;
         this.dataManager = dataManager;
         this.manager = new CodexManager(plugin);
@@ -63,7 +63,7 @@ public class CodexFeature {
         // Initialize sub-components
         this.arcaneItems = new ArcaneItems(plugin);
         this.explorerItems = new ExplorerItems(plugin);
-        this.newGadgets = new NewGadgetsFeature(plugin);
+        this.newGadgets = newGadgets;
         this.codexCrafting = new CodexCrafting(plugin, manager, registry, arcaneItems);
         this.codexPassiveTask = new CodexPassiveTask(plugin, arcaneItems);
         
@@ -3066,7 +3066,7 @@ public class CodexFeature {
                         z.getEquipment().setLeggings(new ItemStack(org.bukkit.Material.IRON_LEGGINGS));
                         z.getEquipment().setBoots(new ItemStack(org.bukkit.Material.IRON_BOOTS));
                     });
-                    zombie.setMetadata("codex_dummy", new FixedMetadataValue(plugin, true));
+                    setMetadata(zombie, plugin, "codex_dummy", true);
 
                     player.sendMessage(MM.deserialize(C_GREEN + toSmallCaps("Spawned a damage test dummy!")));
                     return 1;

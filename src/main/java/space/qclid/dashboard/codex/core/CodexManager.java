@@ -59,7 +59,9 @@ public class CodexManager {
                     for (Object o : list) if (o instanceof String s) set.add(s);
                     unlocked.put(uuid, set);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to load codex data for " + uuidStr + ": " + e.getMessage());
+            }
         }
     }
 }

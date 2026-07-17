@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.CompletableFuture;
 
 import static space.qclid.dashboard.util.TextUtil.*;
 
@@ -24,6 +25,7 @@ public class UpdateFeature {
 
     private final JavaPlugin plugin;
     private File pendingUpdateFile = null;
+    private CompletableFuture<Void> pendingDownload = null;
 
     private static final String UPDATE_URL = "https://www.qclid.space/api/plugin-version";
 
@@ -79,7 +81,7 @@ public class UpdateFeature {
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
 
-            client.sendAsync(request, HttpResponse.BodyHandlers.ofFile(tempFile.toPath())).thenAccept(res -> {
+            this.pendingDownload = client.sendAsync(request, HttpResponse.BodyHandlers.ofFile(tempFile.toPath())).thenAccept(res -> {
                 if (res.statusCode() == 200) {
                     this.pendingUpdateFile = tempFile;
                     String msg = C_GOLD + toSmallCaps("Update downloaded! Replacing file on server shutdown.");
@@ -96,6 +98,7 @@ public class UpdateFeature {
      * Call this from {@code onDisable} to replace the jar on shutdown.
      */
     public void onShutdown() {
+        if (pendingDownload != null) pendingDownload.join();
         if (pendingUpdateFile == null || !pendingUpdateFile.exists()) return;
         try {
             File currentJar = new File(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -116,9 +119,17 @@ public class UpdateFeature {
 
     private boolean isNewer(String latest, String current) {
         try {
-            return Double.parseDouble(latest) > Double.parseDouble(current);
+            String[] latestParts = latest.split("[^\\d]");
+            String[] currentParts = current.split("[^\\d]");
+            int maxLen = Math.max(latestParts.length, currentParts.length);
+            for (int i = 0; i < maxLen; i++) {
+                int l = i < latestParts.length && !latestParts[i].isEmpty() ? Integer.parseInt(latestParts[i]) : 0;
+                int c = i < currentParts.length && !currentParts[i].isEmpty() ? Integer.parseInt(currentParts[i]) : 0;
+                if (l != c) return l > c;
+            }
         } catch (Exception e) {
-            return !latest.equalsIgnoreCase(current);
+            plugin.getLogger().warning("Could not parse versions for comparison: latest=" + latest + ", current=" + current);
         }
+        return false;
     }
 }

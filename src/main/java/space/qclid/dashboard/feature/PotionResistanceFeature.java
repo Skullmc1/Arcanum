@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static space.qclid.dashboard.util.CodexUtil.*;
 import static space.qclid.dashboard.util.TextUtil.*;
 
 /**
@@ -42,8 +43,8 @@ public class PotionResistanceFeature implements Listener {
                 && event.getAction() != EntityPotionEffectEvent.Action.CHANGED) return;
 
         // Skip plugin-applied effects (e.g. Heavy Draw slowness)
-        if (player.hasMetadata("skip_potion_resistance")) {
-            player.removeMetadata("skip_potion_resistance", plugin);
+        if (hasMetadata(player, plugin, "skip_potion_resistance")) {
+            removeMetadata(player, plugin, "skip_potion_resistance");
             return;
         }
 
