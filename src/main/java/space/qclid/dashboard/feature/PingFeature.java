@@ -7,18 +7,20 @@ import java.util.List;
 
 import static space.qclid.dashboard.util.TextUtil.*;
 
-public class SuicideFeature {
+public class PingFeature {
 
     public void registerCommands(Commands commands) {
-        var builder = Commands.literal("suicide")
+        var builder = Commands.literal("ping")
             .executes(ctx -> {
                 if (!(ctx.getSource().getSender() instanceof Player player)) {
                     ctx.getSource().getSender().sendPlainMessage("ᴘʟᴀʏᴇʀѕ ᴏɴʟʏ.");
                     return 1;
                 }
-                player.setHealth(0);
+                int ping = player.getPing();
+                String color = ping < 100 ? C_GREEN : ping < 200 ? C_YELLOW : C_RED;
+                player.sendMessage(MM.deserialize(C_GOLD + toSmallCaps("Your ping: ") + color + ping + "ms"));
                 return 1;
             });
-        commands.register(builder.build(), "Kill yourself to get out of sticky situations", List.of());
+        commands.register(builder.build(), "Check your connection latency", List.of());
     }
 }

@@ -35,6 +35,8 @@ public class DashboardPlugin extends JavaPlugin {
         TrackFeature         trackFeature          = new TrackFeature(dataManager);
         PosFeature           posFeature            = new PosFeature();
         SuicideFeature       suicideFeature        = new SuicideFeature();
+        HatFeature           hatFeature            = new HatFeature();
+        PingFeature          pingFeature           = new PingFeature();
         LinkedChestFeature   linkedChestFeature    = new LinkedChestFeature(dataManager);
         DeathInventoryFeature deathInventoryFeature = new DeathInventoryFeature(this, dataManager);
         NewGadgetsFeature    newGadgetsFeature      = new NewGadgetsFeature(this);
@@ -53,6 +55,8 @@ public class DashboardPlugin extends JavaPlugin {
             trackFeature        .registerCommands(commands);
             posFeature          .registerCommands(commands);
             suicideFeature      .registerCommands(commands);
+            hatFeature          .registerCommands(commands);
+            pingFeature         .registerCommands(commands);
             linkedChestFeature  .registerCommands(commands);
             deathInventoryFeature.registerCommands(commands);
             codexFeature        .registerCommands(commands);

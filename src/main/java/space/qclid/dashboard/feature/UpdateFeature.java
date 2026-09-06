@@ -3,24 +3,26 @@ package space.qclid.dashboard.feature;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static space.qclid.dashboard.util.TextUtil.*;
 
-/**
- * Handles checking for plugin updates from the remote API,
- * downloading the new jar, and replacing it on server shutdown.
- */
 public class UpdateFeature {
 
     private final JavaPlugin plugin;
@@ -28,75 +30,133 @@ public class UpdateFeature {
     private CompletableFuture<Void> pendingDownload = null;
 
     private static final String UPDATE_URL = "https://www.qclid.space/api/plugin-version";
+    private static final int    PROGRESS_INTERVAL = 10;
+    private static final int    BAR_WIDTH = 20;
 
     public UpdateFeature(JavaPlugin plugin) {
         this.plugin = plugin;
     }
 
     public void checkForUpdates(CommandSourceStack source, boolean quiet) {
-        if (pendingUpdateFile != null) return;
+        if (pendingUpdateFile != null) {
+            tell(source, C_GOLD + toSmallCaps("[Dashboard] Update already downloaded — will apply on next restart."));
+            return;
+        }
+        if (pendingDownload != null) {
+            tell(source, C_GOLD + toSmallCaps("[Dashboard] A download is already in progress!"));
+            return;
+        }
 
-        String startMsg = "Checking for updates...";
-        String failMsg  = "Updating failed, will try again next time server restarts.";
-
-        if (source != null) source.getSender().sendMessage(MM.deserialize(C_GOLD + toSmallCaps("[Dashboard] " + startMsg)));
-        else if (!quiet) plugin.getLogger().info(startMsg);
+        tell(source, C_GOLD + toSmallCaps("[Dashboard] Checking for updates…"));
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(UPDATE_URL)).GET().build();
 
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
             if (response.statusCode() != 200) {
-                if (source != null) source.getSender().sendMessage(MM.deserialize(C_RED + toSmallCaps("[Dashboard] " + failMsg)));
-                else if (!quiet) plugin.getLogger().warning(failMsg);
+                tell(source, C_RED + toSmallCaps("[Dashboard] Update server returned status " + response.statusCode()));
                 return;
             }
             try {
                 JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-                String latestVersion  = json.get("version").getAsString();
-                String downloadUrl    = json.get("downloadUrl").getAsString();
+                String latestVersion = json.get("version").getAsString();
+                String downloadUrl   = json.get("downloadUrl").getAsString();
 
-                if (isNewer(latestVersion, plugin.getDescription().getVersion())) {
-                    String msg = "New update found! Downloading v" + latestVersion;
-                    if (source != null) source.getSender().sendMessage(MM.deserialize(C_GOLD + toSmallCaps("[Dashboard] " + msg)));
-                    else plugin.getLogger().info(msg);
-                    downloadAndPrepareUpdate(downloadUrl);
-                } else {
-                    String upToDateMsg = "Plugin is up to date!";
-                    if (source != null) source.getSender().sendMessage(MM.deserialize(C_GREEN + toSmallCaps("[Dashboard] " + upToDateMsg)));
-                    else if (!quiet) plugin.getLogger().info(upToDateMsg);
+                if (!isNewer(latestVersion, plugin.getDescription().getVersion())) {
+                    tell(source, C_GREEN + toSmallCaps("[Dashboard] You're up to date! (v" + plugin.getDescription().getVersion() + ")"));
+                    return;
                 }
+
+                tell(source, C_GOLD + toSmallCaps("[Dashboard] New version v" + latestVersion + " found! Downloading…"));
+                startDownload(source, downloadUrl, latestVersion);
+
             } catch (Exception e) {
-                if (source != null) source.getSender().sendMessage(MM.deserialize(C_RED + toSmallCaps("[Dashboard] " + failMsg)));
-                else if (!quiet) plugin.getLogger().warning(failMsg + " (" + e.getMessage() + ")");
+                tell(source, C_RED + toSmallCaps("[Dashboard] Update check failed: " + e.getMessage()));
             }
         });
     }
 
-    private void downloadAndPrepareUpdate(String url) {
-        try {
-            File tempFile = File.createTempFile("dashboard-update", ".jar");
-            tempFile.deleteOnExit();
+    private void startDownload(CommandSourceStack source, String url, String version) {
+        pendingDownload = CompletableFuture.runAsync(() -> {
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+                long totalBytes = conn.getContentLengthLong();
 
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
+                File tempFile = File.createTempFile("dashboard-update", ".jar");
+                tempFile.deleteOnExit();
 
-            this.pendingDownload = client.sendAsync(request, HttpResponse.BodyHandlers.ofFile(tempFile.toPath())).thenAccept(res -> {
-                if (res.statusCode() == 200) {
-                    this.pendingUpdateFile = tempFile;
-                    String msg = C_GOLD + toSmallCaps("Update downloaded! Replacing file on server shutdown.");
-                    Bukkit.broadcast(MM.deserialize(msg), "dashboard.admin");
-                    plugin.getLogger().info(msg);
+                byte[] buffer = new byte[8192];
+                int read;
+                long totalRead = 0;
+                AtomicLong progress = new AtomicLong(0);
+
+                var progressTask = plugin.getServer().getGlobalRegionScheduler()
+                    .runAtFixedRate(plugin, task -> updateProgress(source, version, progress.get(), totalBytes), 1L, PROGRESS_INTERVAL);
+
+                try (InputStream in = conn.getInputStream(); OutputStream out = new FileOutputStream(tempFile)) {
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                        totalRead += read;
+                        progress.set(totalRead);
+                    }
                 }
-            });
-        } catch (Exception e) {
-            plugin.getLogger().severe("Failed to download update: " + e.getMessage());
-        }
+
+                progressTask.cancel();
+
+                this.pendingUpdateFile = tempFile;
+
+                plugin.getServer().getGlobalRegionScheduler().run(plugin, task -> {
+                    tell(source, C_GREEN + toSmallCaps("[Dashboard] Download complete! v" + version + " will be applied on next restart."));
+                    plugin.getLogger().info("Update v" + version + " downloaded successfully.");
+                });
+
+                this.pendingDownload = null;
+
+            } catch (Exception e) {
+                tell(source, C_RED + toSmallCaps("[Dashboard] Download failed: " + e.getMessage()));
+                plugin.getLogger().severe("Update download failed: " + e.getMessage());
+                this.pendingDownload = null;
+            }
+        });
     }
 
-    /**
-     * Call this from {@code onDisable} to replace the jar on shutdown.
-     */
+    private void updateProgress(CommandSourceStack source, String version, long downloaded, long total) {
+        if (!(source != null && source.getSender() instanceof Player player)) return;
+
+        String bar;
+        String suffix;
+        if (total > 0) {
+            int pct = (int) (downloaded * 100 / Math.max(total, 1));
+            bar = buildBar(pct);
+            suffix = pct + "%";
+        } else {
+            bar = buildBar(0);
+            suffix = formatSize(downloaded);
+        }
+
+        player.sendActionBar(MM.deserialize(C_GOLD + toSmallCaps("Downloading v" + version + " ") + bar + " " + C_ORANGE + suffix));
+    }
+
+    private static String buildBar(int pct) {
+        int filled = pct * BAR_WIDTH / 100;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < filled; i++) sb.append("■");
+        for (int i = filled; i < BAR_WIDTH; i++) sb.append("□");
+        return sb.toString();
+    }
+
+    private static String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
+    private static void tell(CommandSourceStack source, String msg) {
+        if (source != null) source.getSender().sendMessage(MM.deserialize(msg));
+    }
+
     public void onShutdown() {
         if (pendingDownload != null) pendingDownload.join();
         if (pendingUpdateFile == null || !pendingUpdateFile.exists()) return;
@@ -106,7 +166,6 @@ public class UpdateFeature {
             try {
                 Files.copy(pendingUpdateFile.toPath(), currentJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (Exception e) {
-                // Fallback for Windows file locking: use the update folder
                 File updateFolder = plugin.getServer().getUpdateFolderFile();
                 if (!updateFolder.exists()) updateFolder.mkdirs();
                 Files.copy(pendingUpdateFile.toPath(), new File(updateFolder, currentJar.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -128,7 +187,7 @@ public class UpdateFeature {
                 if (l != c) return l > c;
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Could not parse versions for comparison: latest=" + latest + ", current=" + current);
+            plugin.getLogger().warning("Could not parse versions: latest=" + latest + ", current=" + current);
         }
         return false;
     }

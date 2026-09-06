@@ -112,8 +112,32 @@ public class CodexGuiListener implements Listener {
             case RECIPE -> {
                 if (slot == 45) { // Back button
                     player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
-                    // parentCategoryId here represents the subcategory ID (e.g. "arcane.runes")
                     CodexCategoryGui.open(player, registry, manager, holder.getParentCategoryId(), holder.getPage());
+                    return;
+                }
+
+                // Clicked a recipe ingredient — check if it's a custom codex item
+                ItemStack clicked = event.getCurrentItem();
+                if (clicked != null && clicked.getType() != Material.AIR) {
+                    ItemMeta meta = clicked.getItemMeta();
+                    if (meta != null) {
+                        NamespacedKey key = new NamespacedKey(plugin, "item_id");
+                        String ingredientId = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+                        if (ingredientId != null) {
+                            CodexItem ingredientItem = registry.getItem(ingredientId);
+                            if (ingredientItem != null) {
+                                if (ingredientItem.isDefaultUnlocked() || manager.isUnlocked(player.getUniqueId(), ingredientId)) {
+                                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
+                                    CodexCategory cat = registry.getCategoryForItem(ingredientId);
+                                    String parentCatId = cat != null ? cat.getId() : holder.getParentCategoryId();
+                                    CodexRecipeGui.open(player, registry, ingredientId, parentCatId, 0);
+                                } else {
+                                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+                                    player.sendMessage(MM.deserialize(C_RED + toSmallCaps("You have not yet unlocked this item!")));
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
