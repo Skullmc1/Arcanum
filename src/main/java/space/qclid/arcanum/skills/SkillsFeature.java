@@ -129,7 +129,7 @@ public final class SkillsFeature {
                 .then(Commands.argument("player", ArgumentTypes.player())
                     .then(Commands.argument("skill", StringArgumentType.word())
                         .suggests((c, b) -> { suggestSkills(b); return b.buildFuture(); })
-                        .then(Commands.argument("level", IntegerArgumentType.integer(1, 150))
+                        .then(Commands.argument("level", IntegerArgumentType.integer(1, manager.curve().maxLevel()))
                             .executes(ctx -> {
                                 var target = firstPlayer(ctx);
                                 var type = SkillType.fromId(StringArgumentType.getString(ctx, "skill"));
@@ -155,8 +155,14 @@ public final class SkillsFeature {
                                     say(ctx.getSource().getSender(), C_RED + toSmallCaps("Unknown player or skill."));
                                     return 1;
                                 }
-                                manager.addXp(target.get(), type.get(), LongArgumentType.getLong(ctx, "amount"));
-                                say(ctx.getSource().getSender(), C_GREEN + toSmallCaps("Added XP."));
+                                long amount = LongArgumentType.getLong(ctx, "amount");
+                                if (!manager.adminAddXp(target.get(), type.get(), amount)) {
+                                    say(ctx.getSource().getSender(), C_RED + toSmallCaps(type.get().displayName() + " is disabled; nothing was added."));
+                                    return 1;
+                                }
+                                say(ctx.getSource().getSender(), C_GREEN + toSmallCaps("Gave " + amount + " " + type.get().displayName()
+                                    + " xp to " + target.get().getName() + " (level "
+                                    + manager.level(target.get().getUniqueId(), type.get()) + ")"));
                                 return 1;
                             })))))
             .then(Commands.literal("reset")

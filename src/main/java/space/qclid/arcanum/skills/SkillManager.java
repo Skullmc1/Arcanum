@@ -69,25 +69,40 @@ public final class SkillManager {
 
     /** Awards (possibly fractional) XP. Whole XP is applied; the remainder is carried over. */
     public void addXp(Player player, SkillType type, double amount) {
-        if (amount <= 0 || !isEnabled(type) || !canEarn(player)) return;
+        if (!canEarn(player)) return;
+        apply(player, type, amount);
+    }
+
+    /**
+     * Admin grant: like {@link #addXp} but works in any game mode and world.
+     *
+     * @return false if the skill is disabled or the amount is not positive (nothing was added)
+     */
+    public boolean adminAddXp(Player player, SkillType type, long amount) {
+        return apply(player, type, amount);
+    }
+
+    private boolean apply(Player player, SkillType type, double amount) {
+        if (amount <= 0 || !isEnabled(type)) return false;
         UUID id = player.getUniqueId();
 
         Map<SkillType, Double> c = carry.computeIfAbsent(id, k -> new EnumMap<>(SkillType.class));
         double total = c.getOrDefault(type, 0.0) + amount;
         long whole = (long) Math.floor(total);
         c.put(type, total - whole);
-        if (whole <= 0) return;
+        if (whole <= 0) return true;
 
         PlayerSkills s = skills(id);
         int before = s.level(type, curve);
         long next = curve.clampedAdd(s.getXp(type), whole);
-        if (next == s.getXp(type)) return;
+        if (next == s.getXp(type)) return true;
         s.setXp(type, next);
         dirty.add(id);
 
         int after = s.level(type, curve);
         pushPopup(id, type, whole);
         if (after > before) onLevelUp(player, type, after);
+        return true;
     }
 
     /** Admin: sets total XP directly (clamped to the cap). */

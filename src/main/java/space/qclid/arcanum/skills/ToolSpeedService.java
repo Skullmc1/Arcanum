@@ -8,6 +8,7 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import space.qclid.arcanum.compat.Compat;
@@ -85,6 +86,15 @@ public final class ToolSpeedService implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        clear(event.getPlayer());
+    }
+
+    /**
+     * Validates every joining player: a server crash can leave our modifier saved in player data, so any
+     * leftover is removed here and the next 5-tick update re-adds it only if it is still deserved.
+     */
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
         clear(event.getPlayer());
     }
 }

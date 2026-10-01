@@ -155,7 +155,7 @@ Effect is reapplied while sprinting and removed shortly after sprint ends. It ne
 
 - Single jar for 1.21.1 → 26.3. Attribute lookups go through `Compat`, never directly through `Attribute.*`.
 - Do not call methods on types that changed between class and interface across versions (e.g. `Biome`, `Attribute`,
-  `Enchantment`, `Sound`). Use `Keyed` / registry lookups. Tool enchant levels are read through `ItemMeta.getEnchantLevel`.
+  `Enchantment`, `Sound`). Use `Keyed` / registry lookups. Tool enchant levels are read with `ItemStack.getEnchantmentLevel` / `containsEnchantment` (ItemStack is a class on every supported version).
 - After each build phase the byte-code scan (from the Biome fix) is re-run against both the 1.21.1 and 26.3 APIs
   and must report no `BAD` entries.
 - Scheduling uses the plugin's existing region schedulers.

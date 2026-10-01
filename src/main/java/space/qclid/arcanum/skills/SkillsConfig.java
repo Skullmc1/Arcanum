@@ -17,6 +17,11 @@ public final class SkillsConfig {
 
     private static final Map<String, Double> DEFAULT_MINING_XP = defaultMiningXp();
 
+    // Sanity limits: keep the cumulative XP table small and far from overflowing a long.
+    private static final double MAX_CURVE_A = 1000.0;
+    private static final double MAX_CURVE_P = 3.0;
+    private static final int MAX_LEVEL_LIMIT = 1000;
+
     public final double curveA;
     public final double curveP;
     public final int maxLevel;
@@ -45,21 +50,21 @@ public final class SkillsConfig {
         double a = s.getDouble("curve.a", 12.0);
         double p = s.getDouble("curve.p", 1.3);
         int max = s.getInt("curve.max-level", 150);
-        if (a <= 0 || p < 0 || max < 1) {
+        if (a <= 0 || a > MAX_CURVE_A || p < 0 || p > MAX_CURVE_P || max < 1 || max > MAX_LEVEL_LIMIT) {
             log.warning("Invalid curve in skills.yml, using defaults.");
             a = 12.0;
             p = 1.3;
             max = 150;
         }
 
-        Map<String, Double> miningXp = new HashMap<>();
+        // Defaults first, so a partial section only overrides the blocks it lists (set a block to 0 to turn it off).
+        Map<String, Double> miningXp = new HashMap<>(DEFAULT_MINING_XP);
         ConfigurationSection mx = s.getConfigurationSection("xp.mining");
         if (mx != null) {
             for (String key : mx.getKeys(false)) {
                 miningXp.put(key.toUpperCase(), Math.max(0.0, mx.getDouble(key)));
             }
         }
-        if (miningXp.isEmpty()) miningXp.putAll(DEFAULT_MINING_XP);
 
         Set<SkillType> disabled = new HashSet<>();
         for (String id : s.getStringList("disabled-skills")) {
