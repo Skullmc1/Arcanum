@@ -29,7 +29,7 @@ New package `space.qclid.arcanum.skills`. One framework, one small class per ski
 | `SkillType` | Enum of the nine skills: id, display name, icon material, colour. | — |
 | `SkillCurve` | Pure functions: `xpToNext(level)`, `levelForXp(totalXp)`, progress fraction. | config values |
 | `PlayerSkills` | Total XP per `SkillType` for one player; derives level/progress via `SkillCurve`. | `SkillCurve` |
-| `SkillManager` | Loads/saves `PlayerSkills`, `addXp(player, skill, amount)`, level-up detection, fires `SkillLevelUpEvent`, shows action-bar popup and level-up message. | `PlayerSkills`, `SkillsConfig` |
+| `SkillManager` | Loads/saves `PlayerSkills`, `addXp(player, skill, amount)`, level-up detection, shows action-bar popup and level-up message. | `PlayerSkills`, `SkillsConfig` |
 | `SkillsConfig` | Reads `skills.yml`: curve parameters, XP values, perk thresholds, per-skill enable flag, disabled worlds. | — |
 | `Skill` (interface) | `SkillType type()`; each implementation is a `Listener` that awards XP and applies perks. | `SkillManager` |
 | `RunningSkill` … `AcrobaticsSkill` | One class per skill (nine). | `Skill`, `SkillManager` |
@@ -70,10 +70,10 @@ Default XP sources (all in `skills.yml`):
 
 - **Placed blocks:** `PlacedBlockTracker` stores packed block positions in the chunk's `PersistentDataContainer` for
   XP-giving block types only (ores, logs, melons/pumpkins). Breaking a tracked block gives no XP and no perk drops,
-  and the entry is removed. Piston movement clears the entry.
+  and the entry is removed. Blocks moved by pistons lose tracking (known limitation).
 - **Crops:** XP and perks only when `Ageable` is at max age. Replant does not give XP.
 - **Mobs:** no Monster Hunting XP for spawner-spawned mobs (`SpawnReason.SPAWNER`) or for the Codex training dummy (`/codexdummy`).
-- **Running:** only counts when the player is sprinting, on the ground, not riding, not gliding, not in water.
+- **Running:** only counts while sprinting (jumping allowed), not riding, not gliding, not flying, not in water.
   Per-tick distance is capped to reject teleports.
 - **Archery:** hits on armor stands and dummies give no XP.
 - **Fishing:** XP only from `PlayerFishEvent.State.CAUGHT_FISH`.

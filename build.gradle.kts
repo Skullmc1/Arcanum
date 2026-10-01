@@ -22,6 +22,8 @@ val javaRelease = ((findProperty("javaRelease") as String?) ?: "21").toInt()
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:$apiVersion")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
 java {
@@ -45,4 +47,8 @@ tasks.jar {
 tasks.runServer {
     minecraftVersion((findProperty("mcVersion") as String?) ?: "26.3")
     jvmArgs("-Djoml.nounsafe", "--sun-misc-unsafe-memory-access=allow", "-Dcom.mojang.eula.agree=true")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
