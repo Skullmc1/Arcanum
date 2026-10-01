@@ -46,7 +46,7 @@ tasks.jar {
 
 tasks.runServer {
     minecraftVersion((findProperty("mcVersion") as String?) ?: "26.3")
-    jvmArgs("-Djoml.nounsafe", "--sun-misc-unsafe-memory-access=allow", "-Dcom.mojang.eula.agree=true")
+    jvmArgs("-Djoml.nounsafe", "--sun-misc-unsafe-memory-access=allow", "-Dcom.mojang.eula.agree=true", "-Darcanum.noupdate=true")
 }
 
 tasks.test {

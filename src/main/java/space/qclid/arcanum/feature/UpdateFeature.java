@@ -40,7 +40,16 @@ public class UpdateFeature {
         this.plugin = plugin;
     }
 
+    /** Dev servers set -Darcanum.noupdate=true so a local build is never replaced by a release. */
+    private static boolean updatesDisabled() {
+        return Boolean.getBoolean("arcanum.noupdate");
+    }
+
     public void checkForUpdates(CommandSourceStack source, boolean quiet) {
+        if (updatesDisabled()) {
+            if (!quiet) tell(source, C_GOLD + toSmallCaps("[Arcanum] Updates are disabled on this server."));
+            return;
+        }
         if (pendingUpdateFile != null) {
             tell(source, C_GOLD + toSmallCaps("[Arcanum] Update already downloaded — will apply on next restart."));
             return;

@@ -51,6 +51,11 @@ public final class SkillsFeature {
         skills.add(new MiningSkill(manager, config, tracker));
         toolSpeed.register(SkillType.MINING, MiningSkill::isPickaxe, config.mining::breakSpeedBonus);
 
+        if (space.qclid.arcanum.compat.Compat.BLOCK_BREAK_SPEED == null) {
+            plugin.getLogger().warning("Block break speed attribute not found on this server: Mining Efficiency perk is disabled.");
+        }
+        plugin.getLogger().info("Skills loaded: " + skills.size() + " skills.");
+
         var pm = plugin.getServer().getPluginManager();
         pm.registerEvents(tracker, plugin);
         pm.registerEvents(toolSpeed, plugin);

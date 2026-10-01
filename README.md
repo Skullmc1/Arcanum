@@ -26,6 +26,7 @@
 - **Multiblock machinery**: Arcana Table, Heavy Forge, Upgrade Table, Block Duplicator, Blood Altar and more.
 - **Death Chest**: your items are kept in a physical chest with a Wither Skeleton Skull where you died.
 - **Quality of life**: linked chest, hats, ping, shared position, MOTD day counter, and halved duration for repeated harmful potion effects.
+- **Skills**: XP-based skills (Running and Mining available now, more coming) that level up to 150 and unlock perks along the way, such as Speed while sprinting, virtual Efficiency and Fortune while mining, and instant ore smelting at max level. Open `/skills` to see your progress.
 - **Auto-updater**: pulls the newest build from GitHub Releases.
 
 <img src="readme%20media/divider.svg" alt="" width="100%">
@@ -66,6 +67,8 @@ Tested on 1.21.1, 1.21.11, 26.1.2 and 26.3.
 | `/waypoint create \| list \| tp \| delete \| navigate \| share` | `/wp` | Manage your waypoints |
 | `/destination <x y z>` / `clear` | `/dest` | Set a coordinate target and follow the trail |
 | `/track <player>` / `clear` | | Point the HUD at another player |
+| `/skills` | | Open your skill levels and next perks |
+| `/skills set \| addxp \| reset <player> ...` | | Admin: change a player's skill progress (OP or `arcanum.admin`) |
 | `/pos` | `/where` | Broadcast your coordinates with a clickable track button |
 | `/linkchest` and `/chest` | | Link the chest you stand on, then open it from anywhere |
 | `/hat` | | Wear the item you are holding |
