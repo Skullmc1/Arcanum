@@ -1,4 +1,4 @@
-# Dashboard Plugin — Roadmap
+# Arcanum Plugin — Roadmap
 
 ## Planned Features
 

@@ -1,4 +1,4 @@
-# Dashboard Plugin — Implementation Plan
+# Arcanum Plugin — Implementation Plan
 
 > Phased improvements across critical fixes, code quality, UX, feature gaps, and performance.
 
@@ -137,8 +137,8 @@ Also consider switching from `Particle.FLAME` to `Particle.END_ROD` or `Particle
 Standardize all "disabled" states to use `<red>` consistently:
 
 ```
-"global" enabled:  C_GOLD    "Dashboard enabled!"
-"global" disabled: "<red>"   "Dashboard disabled!"   ✓
+"global" enabled:  C_GOLD    "Arcanum HUD enabled!"
+"global" disabled: "<red>"   "Arcanum HUD disabled!"   ✓
 "xyz"    enabled:  C_ORANGE  "XYZ display enabled!"
 "xyz"    disabled: "<red>"   "XYZ display disabled!"  ✓
 "biome"  enabled:  C_YELLOW  "Biome display enabled!"
@@ -238,7 +238,7 @@ public void setShowXyz(boolean v) { showXyz = v; }
 
 ### 3.6 Rename underscore-prefixed fields
 
-**File:** `DashboardPlugin.java:74-75`
+**File:** `ArcanumPlugin.java:74-75`
 
 `_dataManager` → `dataManager`, `_updateFeature` → `updateFeature`
 
@@ -405,7 +405,7 @@ After all Phase 1-4 changes are complete, re-run a performance audit:
 | `codex/gui/CodexGuiListener.java` | 3 | Remove duplicate hasRequirement |
 | `util/TextUtil.java` | 3 | Fix toSmallCaps uppercase, shared hasRequirement |
 | `PlayerSettings.java` | 3 | Encapsulate fields |
-| `DashboardPlugin.java` | 3 | Rename underscore fields |
+| `ArcanumPlugin.java` | 3 | Rename underscore fields |
 | `data/DataManager.java` | 4, 5 | Wire teleport plates, incremental save |
 | `codex/listeners/CodexInteractionListener.java` | 4 | Plate linking handler |
 | `codex/tasks/CodexPassiveTask.java` | 4, 5 | Fix auto-machine logic, optimize scans |

@@ -1,4 +1,4 @@
-# Dashboard Plugin — Item Catalog
+# Arcanum Plugin — Item Catalog
 
 > Auto-generated reference for all custom items, runes, machinery, and tools registered in the Codex system.
 

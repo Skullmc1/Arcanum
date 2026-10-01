@@ -12,7 +12,7 @@ repositories {
 }
 
 // One jar for all versions: compile against the OLDEST supported API (1.21.1, Java 21 bytecode).
-// Version-renamed constants go through space.qclid.dashboard.compat.Compat.
+// Version-renamed constants go through space.qclid.arcanum.compat.Compat.
 // Tested on 1.21.1, 1.21.11, 26.1.2, 26.3. Override with -PapiVersion=... -PjavaRelease=...
 // Test a server version with: ./gradlew runServer -PmcVersion=26.3
 val apiVersion = (findProperty("apiVersion") as String?) ?: "1.21.1-R0.1-SNAPSHOT"
@@ -37,7 +37,7 @@ tasks.processResources {
 }
 
 tasks.jar {
-    archiveFileName.set("Dashboard-${project.version}.jar")
+    archiveFileName.set("Arcanum-${project.version}.jar")
 }
 
 tasks.runServer {
