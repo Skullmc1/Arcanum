@@ -133,7 +133,7 @@ public class CodexPassiveTask {
             }
         }
 
-        AttributeInstance attr = player.getAttribute(Attribute.MAX_HEALTH);
+        AttributeInstance attr = player.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH);
         if (attr != null) {
             AttributeModifier existing = null;
             for (AttributeModifier modifier : attr.getModifiers()) {

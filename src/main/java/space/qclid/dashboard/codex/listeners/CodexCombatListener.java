@@ -604,7 +604,7 @@ public class CodexCombatListener implements Listener {
                 if (hasMetadata(arrow, plugin, "trinitys_well_arrow") && shooterPlayer != null) {
                     if (targetEntity instanceof Player hitPlayer) {
                         event.setCancelled(true);
-                        double maxHealth = hitPlayer.getAttribute(Attribute.MAX_HEALTH).getValue();
+                        double maxHealth = hitPlayer.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH).getValue();
                         hitPlayer.setHealth(Math.min(maxHealth, hitPlayer.getHealth() + 4.0));
                         hitPlayer.getWorld().spawnParticle(org.bukkit.Particle.HEART, hitPlayer.getLocation().add(0, 1, 0), 5, 0.2, 0.2, 0.2, 0.05);
                         hitPlayer.getWorld().playSound(hitPlayer.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.5f);
@@ -688,7 +688,7 @@ public class CodexCombatListener implements Listener {
                 if (hasMetadata(target, plugin, "trinity_marked")) {
                     double leechDmg = event.getFinalDamage();
                     double heal = leechDmg * 0.20;
-                    double maxHp = player.getAttribute(Attribute.MAX_HEALTH).getValue();
+                    double maxHp = player.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH).getValue();
                     player.setHealth(Math.min(maxHp, player.getHealth() + heal));
                     player.getWorld().spawnParticle(org.bukkit.Particle.HEART, player.getLocation().add(0, 1.2, 0), 2, 0.1, 0.1, 0.1);
                     player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.3f, 1.8f);
@@ -746,7 +746,7 @@ public class CodexCombatListener implements Listener {
                 // Fenrir's Bite
                 NamespacedKey fbKey = new NamespacedKey(plugin, "rune_fenrirs_bite");
                 if (meta.getPersistentDataContainer().has(fbKey, PersistentDataType.INTEGER)) {
-                    AttributeInstance maxHealthAttr = target.getAttribute(Attribute.MAX_HEALTH);
+                    AttributeInstance maxHealthAttr = target.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH);
                     if (maxHealthAttr != null && target.getHealth() >= maxHealthAttr.getValue()) {
                         event.setDamage(event.getDamage() * 2.0);
                         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_WOLF_GROWL, 1f, 0.8f);
@@ -757,7 +757,7 @@ public class CodexCombatListener implements Listener {
                 // Anubis' Judgment
                 NamespacedKey ajKey = new NamespacedKey(plugin, "rune_anubis_judgment");
                 if (meta.getPersistentDataContainer().has(ajKey, PersistentDataType.INTEGER)) {
-                    AttributeInstance maxHealthAttr = target.getAttribute(Attribute.MAX_HEALTH);
+                    AttributeInstance maxHealthAttr = target.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH);
                     if (maxHealthAttr != null && (target.getHealth() / maxHealthAttr.getValue()) <= 0.20) {
                         setMetadata(target, plugin, "anubis_execute", true);
                         event.setDamage(99999.0);
@@ -847,7 +847,7 @@ public class CodexCombatListener implements Listener {
                 if (lvl != null) {
                     double damage = event.getFinalDamage();
                     double healAmount = damage * 0.15 * lvl;
-                    double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+                    double maxHealth = player.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH).getValue();
                     player.setHealth(Math.min(maxHealth, player.getHealth() + healAmount));
                     player.getWorld().spawnParticle(org.bukkit.Particle.HEART, player.getLocation().add(0, 1.2, 0), 4, 0.2, 0.2, 0.2);
                     player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.4f, 1.8f);
@@ -914,7 +914,7 @@ public class CodexCombatListener implements Listener {
                         int newStacks = Math.min(10, currentStacks + 1);
                         setMetadata(target, plugin, "scorch_stacks", newStacks);
 
-                        AttributeInstance armorAttr = target.getAttribute(org.bukkit.attribute.Attribute.ARMOR);
+                        AttributeInstance armorAttr = target.getAttribute(space.qclid.dashboard.compat.Compat.ARMOR);
                         if (armorAttr != null) {
                             double baseArmor = armorAttr.getBaseValue();
                             double reduction = baseArmor * 0.09 * newStacks;
@@ -1152,7 +1152,7 @@ public class CodexCombatListener implements Listener {
         if (killer != null) {
             ItemStack mainHand = killer.getInventory().getItemInMainHand();
             if (arcaneItems.isCustomItem(mainHand, "arcane.melee.siphon_blade")) {
-                double maxHealth = killer.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+                double maxHealth = killer.getAttribute(space.qclid.dashboard.compat.Compat.MAX_HEALTH).getValue();
                 double currentHealth = killer.getHealth();
                 double healAmount = maxHealth * 0.15;
                 killer.setHealth(Math.min(maxHealth, currentHealth + healAmount));
@@ -1191,7 +1191,7 @@ public class CodexCombatListener implements Listener {
 
 
     private void applyArmorReduction(LivingEntity target, String key, double value) {
-        AttributeInstance attr = target.getAttribute(Attribute.ARMOR);
+        AttributeInstance attr = target.getAttribute(space.qclid.dashboard.compat.Compat.ARMOR);
         if (attr != null) {
             AttributeModifier existing = null;
             for (AttributeModifier modifier : attr.getModifiers()) {
@@ -1208,7 +1208,7 @@ public class CodexCombatListener implements Listener {
     }
 
     private void removeArmorReduction(LivingEntity target, String key) {
-        AttributeInstance attr = target.getAttribute(Attribute.ARMOR);
+        AttributeInstance attr = target.getAttribute(space.qclid.dashboard.compat.Compat.ARMOR);
         if (attr != null) {
             for (AttributeModifier modifier : attr.getModifiers()) {
                 if (key.equals(modifier.getName())) {
