@@ -4,8 +4,8 @@
 
 <br>
 
-[![Latest release](https://img.shields.io/github/v/release/Skullmc1/Dashboard?style=for-the-badge&color=8b5cf6&label=release)](https://github.com/Skullmc1/Dashboard/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/Skullmc1/Dashboard/release.yml?style=for-the-badge&color=2dd4bf&label=build)](https://github.com/Skullmc1/Dashboard/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/Skullmc1/Arcanum?style=for-the-badge&color=8b5cf6&label=release)](https://github.com/Skullmc1/Arcanum/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/Skullmc1/Arcanum/release.yml?style=for-the-badge&color=2dd4bf&label=build)](https://github.com/Skullmc1/Arcanum/actions/workflows/release.yml)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1%20→%2026.3-f5d98b?style=for-the-badge)
 ![Paper](https://img.shields.io/badge/Paper-required-6366f1?style=for-the-badge)
 
@@ -47,7 +47,7 @@ Tested on 1.21.1, 1.21.11, 26.1.2 and 26.3.
 
 ## Installation
 
-1. Download `Arcanum-<version>.jar` from the [latest release](https://github.com/Skullmc1/Dashboard/releases/latest).
+1. Download `Arcanum-<version>.jar` from the [latest release](https://github.com/Skullmc1/Arcanum/releases/latest).
 2. Drop it into your server's `plugins/` folder.
 3. Restart the server.
 
@@ -86,7 +86,7 @@ The full item reference lives in [docs/README.md](docs/README.md); the items tha
 
 ## Updates
 
-Arcanum checks the [GitHub Releases](https://github.com/Skullmc1/Dashboard/releases) page periodically. When a newer version is published it downloads the jar and applies it on the next server restart. You can also trigger a check yourself with `/arcanum update`.
+Arcanum checks the [GitHub Releases](https://github.com/Skullmc1/Arcanum/releases) page periodically. When a newer version is published it downloads the jar and applies it on the next server restart. You can also trigger a check yourself with `/arcanum update`.
 
 Every push to `main` is built by GitHub Actions and published as a release named `v<base>.<build>`.
 

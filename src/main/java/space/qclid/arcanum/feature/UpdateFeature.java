@@ -31,7 +31,7 @@ public class UpdateFeature {
     private CompletableFuture<Void> pendingDownload = null;
 
     /** GitHub repository whose latest release provides the update. */
-    private static final String GITHUB_REPO = "Skullmc1/Dashboard";
+    private static final String GITHUB_REPO = "Skullmc1/Arcanum";
     private static final String LATEST_RELEASE_URL = "https://api.github.com/repos/" + GITHUB_REPO + "/releases/latest";
     private static final int    PROGRESS_INTERVAL = 10;
     private static final int    BAR_WIDTH = 20;
