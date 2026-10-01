@@ -20,11 +20,17 @@ public class ActionBarFeature {
     private final JavaPlugin plugin;
     private final DataManager data;
     private final UpdateFeature updateFeature;
+    private java.util.function.Function<java.util.UUID, String> skillPopup;
 
     public ActionBarFeature(JavaPlugin plugin, DataManager data, UpdateFeature updateFeature) {
         this.plugin        = plugin;
         this.data          = data;
         this.updateFeature = updateFeature;
+    }
+
+    /** Provides MiniMessage text for the skill XP popup (null when none is showing). */
+    public void setSkillPopup(java.util.function.Function<java.util.UUID, String> skillPopup) {
+        this.skillPopup = skillPopup;
     }
 
     public void registerCommands(Commands commands) {
@@ -49,7 +55,11 @@ public class ActionBarFeature {
 
     public void update(Player player) {
         PlayerSettings settings = data.getOrCreate(player.getUniqueId());
-        if (!settings.globalEnabled) return;
+        String popup = skillPopup == null ? null : skillPopup.apply(player.getUniqueId());
+        if (!settings.globalEnabled) {
+            if (popup != null) player.sendActionBar(MM.deserialize(popup));
+            return;
+        }
 
         Location loc = player.getLocation();
         StringBuilder sb = new StringBuilder();
@@ -103,6 +113,10 @@ public class ActionBarFeature {
             sb.append(C_YELLOW).append("❊ ").append(toSmallCaps(biome));
         }
 
+        if (popup != null) {
+            if (!sb.isEmpty()) sb.append(C_GRAY).append("| ");
+            sb.append(popup);
+        }
         if (!sb.isEmpty()) player.sendActionBar(MM.deserialize(sb.toString().trim()));
     }
 

@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import space.qclid.arcanum.codex.CodexFeature;
 import space.qclid.arcanum.data.DataManager;
 import space.qclid.arcanum.feature.*;
+import space.qclid.arcanum.skills.SkillsFeature;
 
 /**
  * Arcanum Plugin — main entry point.
@@ -34,6 +35,8 @@ public class ArcanumPlugin extends JavaPlugin {
         // ── Features (Listener subclasses self-register in their constructors) ─
         UpdateFeature        updateFeature        = new UpdateFeature(this);
         ActionBarFeature     actionBarFeature      = new ActionBarFeature(this, dataManager, updateFeature);
+        SkillsFeature        skillsFeature         = new SkillsFeature(this);
+        actionBarFeature.setSkillPopup(skillsFeature::popupFor);
         NavigationFeature    navigationFeature     = new NavigationFeature(dataManager);
         WaypointFeature      waypointFeature       = new WaypointFeature(dataManager);
         DestinationFeature   destinationFeature    = new DestinationFeature(dataManager);
@@ -65,6 +68,7 @@ public class ArcanumPlugin extends JavaPlugin {
             linkedChestFeature  .registerCommands(commands);
             deathInventoryFeature.registerCommands(commands);
             codexFeature        .registerCommands(commands);
+            skillsFeature       .registerCommands(commands);
         });
 
         // ── Schedulers ────────────────────────────────────────────────────────
@@ -79,18 +83,23 @@ public class ArcanumPlugin extends JavaPlugin {
         getServer().getGlobalRegionScheduler().runAtFixedRate(this,
             task -> updateFeature.checkForUpdates(null, true), 1L, UPDATE_CHECK_INTERVAL);
 
+        skillsFeature.start();
+
         // Store as fields for onDisable access
         this.dataManager    = dataManager;
         this.updateFeature  = updateFeature;
+        this.skillsFeature  = skillsFeature;
     }
 
     // Held purely so onDisable can call save/shutdown
     private DataManager    dataManager;
     private UpdateFeature  updateFeature;
     private CodexFeature   codexFeature;
+    private SkillsFeature  skillsFeature;
 
     @Override
     public void onDisable() {
+        if (skillsFeature != null) skillsFeature.shutdown();
         if (dataManager   != null) dataManager.save();
         if (updateFeature != null) updateFeature.onShutdown();
         if (codexFeature  != null) codexFeature.getManager().save();
