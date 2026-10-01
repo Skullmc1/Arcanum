@@ -1234,6 +1234,13 @@ public class CodexInteractionListener implements Listener {
         }
     }
 
+    /** These tools cancel the break and remove blocks themselves, so the skills system is told directly. */
+    private void rewardMining(Player player, Block block) {
+        if (plugin instanceof space.qclid.arcanum.ArcanumPlugin arcanum && arcanum.skills() != null) {
+            arcanum.skills().rewardBlockBreak(player, block);
+        }
+    }
+
     @EventHandler
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
@@ -1309,6 +1316,7 @@ public class CodexInteractionListener implements Listener {
             for (Block ore : ores) {
                 if (ore.getType() == oreType) {
                     java.util.Collection<ItemStack> oreDrops = ore.getDrops(item, player);
+                    rewardMining(player, ore);
                     ore.setType(Material.AIR);
                     damageTool(player, item, 1);
                     
@@ -1331,6 +1339,7 @@ public class CodexInteractionListener implements Listener {
         if (hasSmelt || hasTele) {
             event.setCancelled(true);
             java.util.Collection<ItemStack> drops = block.getDrops(item, player);
+            rewardMining(player, block);
             block.setType(Material.AIR);
             damageTool(player, item, 1);
 
@@ -1388,6 +1397,7 @@ public class CodexInteractionListener implements Listener {
 
             for (Block b : toBreak) {
                 java.util.Collection<ItemStack> drillDrops = b.getDrops(item, player);
+                rewardMining(player, b);
                 b.setType(Material.AIR);
                 damageTool(player, item, 1);
 

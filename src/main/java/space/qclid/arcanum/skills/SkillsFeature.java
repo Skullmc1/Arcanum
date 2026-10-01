@@ -33,6 +33,7 @@ public final class SkillsFeature {
     private final JavaPlugin plugin;
     private final SkillManager manager;
     private final ToolSpeedService toolSpeed;
+    private final MiningSkill mining;
     private final List<Skill> skills = new ArrayList<>();
 
     public SkillsFeature(JavaPlugin plugin) {
@@ -47,8 +48,9 @@ public final class SkillsFeature {
         PlacedBlockTracker tracker = new PlacedBlockTracker();
         this.toolSpeed = new ToolSpeedService(manager);
 
+        this.mining = new MiningSkill(manager, config, tracker);
         skills.add(new RunningSkill(manager, config));
-        skills.add(new MiningSkill(manager, config, tracker));
+        skills.add(mining);
         toolSpeed.register(SkillType.MINING, MiningSkill::isPickaxe, config.mining::breakSpeedBonus);
 
         if (space.qclid.arcanum.compat.Compat.BLOCK_BREAK_SPEED == null) {
@@ -64,6 +66,13 @@ public final class SkillsFeature {
     }
 
     public SkillManager manager() { return manager; }
+
+    /**
+     * For tools that break blocks themselves (Codex runes): awards Mining XP for the block. Call before it is removed.
+     */
+    public void rewardBlockBreak(Player player, org.bukkit.block.Block block) {
+        mining.awardXp(player, block, player.getInventory().getItemInMainHand());
+    }
 
     /** XP popup text for the action bar, or null. */
     public String popupFor(UUID id) { return manager.popupFor(id); }

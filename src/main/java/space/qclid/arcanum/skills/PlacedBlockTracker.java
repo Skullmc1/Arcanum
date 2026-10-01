@@ -4,9 +4,13 @@ import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.Directional;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -43,6 +47,28 @@ public final class PlacedBlockTracker implements Listener {
         Block block = event.getBlockPlaced();
         if (!isTrackedType(block.getType())) return;
         add(block);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPistonExtend(BlockPistonExtendEvent event) {
+        moveTracked(event.getBlocks(), event.getBlock(), true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPistonRetract(BlockPistonRetractEvent event) {
+        moveTracked(event.getBlocks(), event.getBlock(), false);
+    }
+
+    /** A block pushed or pulled by a piston keeps its "placed by a player" mark at its new position. */
+    private void moveTracked(List<Block> moved, Block piston, boolean extending) {
+        if (moved.isEmpty() || !(piston.getBlockData() instanceof Directional directional)) return;
+        BlockFace direction = extending ? directional.getFacing() : directional.getFacing().getOppositeFace();
+        // Forget every old position first, then mark the new ones: moved blocks can land on each other's spots.
+        List<Block> destinations = new ArrayList<>();
+        for (Block block : moved) {
+            if (consumeIfPlaced(block)) destinations.add(block.getRelative(direction));
+        }
+        for (Block destination : destinations) add(destination);
     }
 
     /** @return true (and forgets the block) if a player placed this block. */

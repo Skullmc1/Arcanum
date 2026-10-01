@@ -91,6 +91,11 @@ public class ArcanumPlugin extends JavaPlugin {
         this.skillsFeature  = skillsFeature;
     }
 
+    /** Skills subsystem (null until enabled); lets Codex tools award skill XP for blocks they break. */
+    public SkillsFeature skills() {
+        return skillsFeature;
+    }
+
     // Held purely so onDisable can call save/shutdown
     private DataManager    dataManager;
     private UpdateFeature  updateFeature;
