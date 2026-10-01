@@ -71,4 +71,17 @@ class SkillCurveTest {
     void rejectsInvalidMaxLevel() {
         assertThrows(IllegalArgumentException.class, () -> new SkillCurve(12.0, 1.3, 0));
     }
+
+    @Test
+    void clampedAddNeverOverflowsOrWipesProgress() {
+        assertEquals(curve.maxTotalXp(), curve.clampedAdd(1000, Long.MAX_VALUE));
+        assertEquals(curve.maxTotalXp(), curve.clampedAdd(curve.maxTotalXp() - 1, 5));
+        assertEquals(15, curve.clampedAdd(10, 5));
+    }
+
+    @Test
+    void clampedAddIgnoresNonPositiveAmounts() {
+        assertEquals(10, curve.clampedAdd(10, -3));
+        assertEquals(10, curve.clampedAdd(10, 0));
+    }
 }

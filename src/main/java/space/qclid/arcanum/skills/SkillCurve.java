@@ -63,4 +63,12 @@ public final class SkillCurve {
     }
 
     public long maxTotalXp() { return cumulative[maxLevel]; }
+
+    /** {@code current + amount}, saturating at the cap; non-positive amounts change nothing. */
+    public long clampedAdd(long current, long amount) {
+        long max = maxTotalXp();
+        if (amount <= 0) return Math.min(Math.max(0, current), max);
+        if (current >= max || amount >= max - current) return max;
+        return current + amount;
+    }
 }

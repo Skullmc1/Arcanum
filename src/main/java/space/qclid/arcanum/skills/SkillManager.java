@@ -2,21 +2,14 @@ package space.qclid.arcanum.skills;
 
 import org.bukkit.GameMode;
 import org.bukkit.Sound;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.InvalidConfigurationException;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,6 +28,7 @@ public final class SkillManager {
     private final JavaPlugin plugin;
     private final SkillsConfig config;
     private final SkillCurve curve;
+    private final SkillDataStore store;
     private final Map<UUID, PlayerSkills> players = new HashMap<>();
     private final Set<UUID> dirty = new HashSet<>();
     private final Map<UUID, Map<SkillType, Double>> carry = new HashMap<>();
@@ -44,7 +38,8 @@ public final class SkillManager {
         this.plugin = plugin;
         this.config = config;
         this.curve = curve;
-        load();
+        this.store = new SkillDataStore(new File(plugin.getDataFolder(), "skill-data.yml"), plugin.getLogger(), curve);
+        players.putAll(store.load());
     }
 
     public SkillCurve curve() { return curve; }
@@ -85,7 +80,7 @@ public final class SkillManager {
 
         PlayerSkills s = skills(id);
         int before = s.level(type, curve);
-        long next = Math.min(curve.maxTotalXp(), s.getXp(type) + whole);
+        long next = curve.clampedAdd(s.getXp(type), whole);
         if (next == s.getXp(type)) return;
         s.setXp(type, next);
         dirty.add(id);
@@ -134,71 +129,9 @@ public final class SkillManager {
 
     // ── Persistence ───────────────────────────────────────────────────────────
 
-    private File dataFile() {
-        return new File(plugin.getDataFolder(), "skill-data.yml");
-    }
-
-    private void load() {
-        File file = dataFile();
-        if (!file.exists()) return;
-
-        YamlConfiguration yaml = new YamlConfiguration();
-        try {
-            yaml.load(file);
-        } catch (IOException | InvalidConfigurationException e) {
-            File backup = new File(plugin.getDataFolder(), "skill-data.yml.corrupt-" + System.currentTimeMillis());
-            plugin.getLogger().severe("Could not read skill-data.yml (" + e.getMessage()
-                + "). Moved it to " + backup.getName() + " and starting empty.");
-            if (!file.renameTo(backup)) {
-                plugin.getLogger().severe("Could not back up the corrupt skill-data.yml.");
-            }
-            return;
-        }
-
-        ConfigurationSection root = yaml.getConfigurationSection("players");
-        if (root == null) return;
-        for (String key : root.getKeys(false)) {
-            UUID id;
-            try {
-                id = UUID.fromString(key);
-            } catch (IllegalArgumentException e) {
-                plugin.getLogger().warning("skill-data.yml: skipping invalid player id '" + key + "'");
-                continue;
-            }
-            ConfigurationSection ps = root.getConfigurationSection(key);
-            if (ps == null) continue;
-            PlayerSkills s = new PlayerSkills();
-            for (String skillId : ps.getKeys(false)) {
-                Optional<SkillType> type = SkillType.fromId(skillId);
-                if (type.isEmpty()) {
-                    plugin.getLogger().warning("skill-data.yml: skipping unknown skill '" + skillId + "'");
-                    continue;
-                }
-                s.setXp(type.get(), Math.min(Math.max(0, ps.getLong(skillId)), curve.maxTotalXp()));
-            }
-            players.put(id, s);
-        }
-    }
-
     /** Writes all progress to disk if anything changed. */
     public void save() {
         if (dirty.isEmpty()) return;
-        YamlConfiguration yaml = new YamlConfiguration();
-        for (Map.Entry<UUID, PlayerSkills> e : players.entrySet()) {
-            for (SkillType t : SkillType.values()) {
-                long xp = e.getValue().getXp(t);
-                if (xp > 0) yaml.set("players." + e.getKey() + "." + t.id(), xp);
-            }
-        }
-        File file = dataFile();
-        File tmp = new File(plugin.getDataFolder(), "skill-data.yml.tmp");
-        try {
-            plugin.getDataFolder().mkdirs();
-            yaml.save(tmp);
-            Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            dirty.clear();
-        } catch (IOException e) {
-            plugin.getLogger().severe("Could not save skill-data.yml: " + e.getMessage());
-        }
+        if (store.save(players)) dirty.clear();
     }
 }
