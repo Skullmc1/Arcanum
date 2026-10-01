@@ -96,9 +96,10 @@ public class ActionBarFeature {
 
         if (settings.showBiome) {
             if (!sb.isEmpty()) sb.append(C_GRAY).append("| ");
-            String biome = player.getWorld()
-                    .getBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ())
-                    .key().value().replace("minecraft:", "").replace("_", " ");
+            // Biome is an enum on 1.21.1 and an interface on newer versions: go through Keyed.
+            org.bukkit.Keyed biomeKey = player.getWorld()
+                    .getBiome(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+            String biome = biomeKey.getKey().getKey().replace("_", " ");
             sb.append(C_YELLOW).append("❊ ").append(toSmallCaps(biome));
         }
 
