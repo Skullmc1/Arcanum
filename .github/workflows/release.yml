@@ -31,7 +31,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew build -PbuildNumber=${{ github.run_number }} --no-daemon
+        run: bash ./gradlew build -PbuildNumber=${{ github.run_number }} --no-daemon
 
       - name: Create release
         env:
