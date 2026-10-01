@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Arcanum features">
+  <style>
+    .card{fill:#1b1038;stroke:#3b2a6b;stroke-width:1.5}
+    .t{font-family:'Segoe UI',system-ui,sans-serif;font-size:21px;font-weight:700;fill:#f5f3ff}
+    .d{font-family:'Segoe UI',system-ui,sans-serif;font-size:14.5px;fill:#b9b4e0}
+    .ic{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+  </style>
+  <rect width="1200" height="420" rx="18" fill="#150b2e"/>
+
+  <g transform="translate(30 30)"><rect class="card" width="350" height="170" rx="14"/>
+    <g transform="translate(40 40)" class="ic" stroke="#f5d98b"><rect x="-16" y="-10" width="40" height="22" rx="4"/><path d="M-8 -2h8M-8 4h14"/></g>
+    <text class="t" x="28" y="100">Live HUD</text>
+    <text class="d" x="28" y="126">Action bar with coordinates, biome</text>
+    <text class="d" x="28" y="146">and Nether-overworld conversion.</text></g>
+
+  <g transform="translate(425 30)"><rect class="card" width="350" height="170" rx="14"/>
+    <g transform="translate(40 40)" class="ic" stroke="#5eead4"><path d="M0 -16c9 0 16 7 16 16 0 11-16 24-16 24S-16 11-16 0c0-9 7-16 16-16z"/><circle r="5"/></g>
+    <text class="t" x="28" y="100">Waypoints &amp; Navigation</text>
+    <text class="d" x="28" y="126">Save, share and teleport to places.</text>
+    <text class="d" x="28" y="146">Follow a particle trail to any target.</text></g>
+
+  <g transform="translate(820 30)"><rect class="card" width="350" height="170" rx="14"/>
+    <g transform="translate(40 40)" class="ic" stroke="#c4b5fd"><circle r="17"/><path d="M0 -17v34M-17 0h34"/><path d="M-12 -12l24 24M12 -12l-24 24" stroke-opacity="0.5"/></g>
+    <text class="t" x="28" y="100">Runes &amp; Enchantments</text>
+    <text class="d" x="28" y="126">Normal, demonic and holy runes,</text>
+    <text class="d" x="28" y="146">upgradeable at the Upgrade Table.</text></g>
+
+  <g transform="translate(30 220)"><rect class="card" width="350" height="170" rx="14"/>
+    <g transform="translate(40 40)" class="ic" stroke="#f5d98b"><path d="M-16 8l16-24 16 24z"/><path d="M-16 8v8h32v-8"/></g>
+    <text class="t" x="28" y="100">Multiblock Machinery</text>
+    <text class="d" x="28" y="126">Arcana Table, Heavy Forge, Blood</text>
+    <text class="d" x="28" y="146">Altar, Block Duplicator and more.</text></g>
+
+  <g transform="translate(425 220)"><rect class="card" width="350" height="170" rx="14"/>
+    <g transform="translate(40 40)" class="ic" stroke="#5eead4"><path d="M-16 16L8 -8"/><path d="M8 -8l8-8M8 -8l-4-12M8 -8l12 4"/><circle cx="-16" cy="16" r="3"/></g>
+    <text class="t" x="28" y="100">Explorer Gadgets</text>
+    <text class="d" x="28" y="126">Grappling hooks, web slingers, void</text>
+    <text class="d" x="28" y="146">bag, ender backpack, safari lasso.</text></g>
+
+  <g transform="translate(820 220)"><rect class="card" width="350" height="170" rx="14"/>
+    <g transform="translate(40 40)" class="ic" stroke="#c4b5fd"><path d="M-12 -18h24v36l-12-8-12 8z"/></g>
+    <text class="t" x="28" y="100">Death Chest &amp; Utilities</text>
+    <text class="d" x="28" y="126">Physical death chest, linked chest,</text>
+    <text class="d" x="28" y="146">/hat, /ping, /pos, auto-updater.</text></g>
+</svg>

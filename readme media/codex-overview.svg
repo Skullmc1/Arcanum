@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-label="Codex structure: Arcane and Explorer categories">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c1d95"/><stop offset="1" stop-color="#2e1065"/></linearGradient>
+    <linearGradient id="e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#115e59"/><stop offset="1" stop-color="#0f3f46"/></linearGradient>
+  </defs>
+  <rect width="1200" height="300" rx="18" fill="#150b2e"/>
+  <g font-family="'Segoe UI', system-ui, sans-serif">
+    <rect x="480" y="22" width="240" height="52" rx="12" fill="#f5d98b"/>
+    <text x="600" y="56" text-anchor="middle" font-size="22" font-weight="700" fill="#2a1a00">/codex</text>
+    <path d="M600 74v22M600 96H300M600 96H900M300 96v26M900 96v26" stroke="#8b5cf6" stroke-width="2" fill="none"/>
+
+    <rect x="120" y="122" width="360" height="52" rx="12" fill="url(#a)" stroke="#8b5cf6"/>
+    <text x="300" y="156" text-anchor="middle" font-size="21" font-weight="700" fill="#f5f3ff">Arcane</text>
+    <rect x="720" y="122" width="360" height="52" rx="12" fill="url(#e)" stroke="#2dd4bf"/>
+    <text x="900" y="156" text-anchor="middle" font-size="21" font-weight="700" fill="#f0fdfa">Explorer</text>
+
+    <g font-size="15" fill="#ddd6fe">
+      <text x="140" y="208">Runes: normal · demonic · holy</text>
+      <text x="140" y="232">Armor · Melee · Ranged</text>
+      <text x="140" y="256">Trinkets · Materials</text>
+    </g>
+    <g font-size="15" fill="#99f6e4">
+      <text x="740" y="208">Runes: normal · holy</text>
+      <text x="740" y="232">Navigation · Exploration</text>
+      <text x="740" y="256">Gadgets · Tools · Armor</text>
+    </g>
+    <text x="600" y="232" text-anchor="middle" font-size="14" fill="#a5b4fc">+ crafting machinery</text>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 170" width="1200" height="170" role="img" aria-label="Supported versions: 1.21.1 to 26.3, single jar">
+  <rect width="1200" height="170" rx="18" fill="#150b2e"/>
+  <text x="600" y="38" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif" font-size="18" fill="#c4b5fd" letter-spacing="2">ONE JAR · EVERY VERSION</text>
+  <line x1="110" y1="95" x2="1090" y2="95" stroke="#8b5cf6" stroke-width="3" stroke-opacity="0.5"/>
+  <g font-family="'Segoe UI', system-ui, sans-serif" text-anchor="middle">
+    <g transform="translate(110 95)"><circle r="13" fill="#8b5cf6"/><text y="42" font-size="20" font-weight="700" fill="#f5f3ff">1.21.1</text><text y="64" font-size="13" fill="#a5b4fc">minimum</text></g>
+    <g transform="translate(390 95)"><circle r="11" fill="#6366f1"/><text y="42" font-size="20" font-weight="700" fill="#f5f3ff">1.21.11</text><text y="64" font-size="13" fill="#a5b4fc">last 1.x</text></g>
+    <g transform="translate(670 95)"><circle r="11" fill="#2dd4bf"/><text y="42" font-size="20" font-weight="700" fill="#f5f3ff">26.1.x</text><text y="64" font-size="13" fill="#a5b4fc">new numbering</text></g>
+    <g transform="translate(880 95)"><circle r="11" fill="#2dd4bf"/><text y="42" font-size="20" font-weight="700" fill="#f5f3ff">26.2</text></g>
+    <g transform="translate(1090 95)"><circle r="14" fill="#f5d98b"/><text y="42" font-size="20" font-weight="700" fill="#f5f3ff">26.3</text><text y="64" font-size="13" fill="#fde68a">latest</text></g>
+  </g>
+</svg>

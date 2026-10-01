@@ -4,7 +4,9 @@ plugins {
 }
 
 group = "space.qclid"
-version = "1.12"
+// Local builds are "<base>"; CI passes -PbuildNumber=N, giving "<base>.N" (see .github/workflows/release.yml).
+val baseVersion = "1.12"
+version = (findProperty("buildNumber") as String?)?.let { "$baseVersion.$it" } ?: baseVersion
 
 repositories {
     mavenCentral()

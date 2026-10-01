@@ -8,6 +8,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -29,7 +30,9 @@ public class UpdateFeature {
     private File pendingUpdateFile = null;
     private CompletableFuture<Void> pendingDownload = null;
 
-    private static final String UPDATE_URL = "https://www.qclid.space/api/plugin-version";
+    /** GitHub repository whose latest release provides the update. */
+    private static final String GITHUB_REPO = "Skullmc1/Dashboard";
+    private static final String LATEST_RELEASE_URL = "https://api.github.com/repos/" + GITHUB_REPO + "/releases/latest";
     private static final int    PROGRESS_INTERVAL = 10;
     private static final int    BAR_WIDTH = 20;
 
@@ -50,17 +53,28 @@ public class UpdateFeature {
         tell(source, C_GOLD + toSmallCaps("[Arcanum] Checking for updates…"));
 
         HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(UPDATE_URL)).GET().build();
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(LATEST_RELEASE_URL))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Arcanum-Updater")
+            .GET().build();
 
         client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
+            if (response.statusCode() == 404) {
+                tell(source, C_GOLD + toSmallCaps("[Arcanum] No release has been published yet."));
+                return;
+            }
             if (response.statusCode() != 200) {
-                tell(source, C_RED + toSmallCaps("[Arcanum] Update server returned status " + response.statusCode()));
+                tell(source, C_RED + toSmallCaps("[Arcanum] GitHub returned status " + response.statusCode()));
                 return;
             }
             try {
                 JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-                String latestVersion = json.get("version").getAsString();
-                String downloadUrl   = json.get("downloadUrl").getAsString();
+                String latestVersion = json.get("tag_name").getAsString().replaceFirst("^[vV]", "");
+                String downloadUrl   = findJarAsset(json);
+                if (downloadUrl == null) {
+                    tell(source, C_RED + toSmallCaps("[Arcanum] Latest release has no plugin jar attached."));
+                    return;
+                }
 
                 if (!isNewer(latestVersion, plugin.getDescription().getVersion())) {
                     tell(source, C_GREEN + toSmallCaps("[Arcanum] You're up to date! (v" + plugin.getDescription().getVersion() + ")"));
@@ -80,6 +94,7 @@ public class UpdateFeature {
         pendingDownload = CompletableFuture.runAsync(() -> {
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setRequestProperty("User-Agent", "Arcanum-Updater");
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(10000);
                 long totalBytes = conn.getContentLengthLong();
@@ -105,6 +120,11 @@ public class UpdateFeature {
 
                 progressTask.cancel();
 
+                if (!looksLikePluginJar(tempFile)) {
+                    tempFile.delete();
+                    throw new IOException("downloaded file is not a valid plugin jar");
+                }
+
                 this.pendingUpdateFile = tempFile;
 
                 plugin.getServer().getGlobalRegionScheduler().run(plugin, task -> {
@@ -120,6 +140,27 @@ public class UpdateFeature {
                 this.pendingDownload = null;
             }
         });
+    }
+
+    /** Picks the plugin jar (not sources/javadoc) from a GitHub release payload. */
+    private static String findJarAsset(JsonObject release) {
+        if (!release.has("assets")) return null;
+        for (var el : release.getAsJsonArray("assets")) {
+            JsonObject asset = el.getAsJsonObject();
+            String name = asset.get("name").getAsString();
+            if (name.endsWith(".jar") && !name.endsWith("-sources.jar") && !name.endsWith("-javadoc.jar")) {
+                return asset.get("browser_download_url").getAsString();
+            }
+        }
+        return null;
+    }
+
+    private static boolean looksLikePluginJar(File file) {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file)) {
+            return zip.getEntry("paper-plugin.yml") != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void updateProgress(CommandSourceStack source, String version, long downloaded, long total) {
